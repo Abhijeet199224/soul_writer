@@ -37,6 +37,7 @@ interface WritingCanvasProps {
   onSelectionSoulCheck: (selectedText: string) => Promise<void>;
   selectionLoading: boolean;
   soulCheckInsights?: SoulCheckInsight[];
+  activeInsightIndex?: number | null;
   onHighlightInsight?: (insightIndex: number) => void;
 }
 
@@ -65,6 +66,7 @@ export function WritingCanvas({
   onSelectionSoulCheck,
   selectionLoading,
   soulCheckInsights = [],
+  activeInsightIndex = null,
   onHighlightInsight,
 }: WritingCanvasProps) {
   const plainDraft = useMemo(() => htmlToPlainText(draft), [draft]);
@@ -130,6 +132,7 @@ export function WritingCanvas({
             onClearHover();
           }}
           soulCheckInsights={soulCheckInsights}
+          activeInsightIndex={activeInsightIndex}
           onHighlightInsight={onHighlightInsight}
           onSelectionSoulCheck={(text) => void onSelectionSoulCheck(text)}
           selectionLoading={selectionLoading}

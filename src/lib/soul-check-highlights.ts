@@ -24,6 +24,35 @@ export function findTextRangesInDoc(
   return ranges;
 }
 
+function readInsightIndexFromMarks(
+  marks: ReadonlyArray<{ type: { name: string }; attrs: Record<string, unknown> }>,
+): number | null {
+  const mark = marks.find(
+    (m) => m.type.name === "highlight" && m.attrs.insightIndex != null,
+  );
+  if (!mark) return null;
+  const index = Number(mark.attrs.insightIndex);
+  return Number.isNaN(index) ? null : index;
+}
+
+/** Resolve insight index when cursor is inside or adjacent to a soul-check mark. */
+export function getInsightIndexAtPos(
+  editor: Editor,
+  pos: number,
+): number | null {
+  const doc = editor.state.doc;
+  const positions = [pos, pos - 1, pos + 1].filter(
+    (p) => p >= 0 && p <= doc.content.size,
+  );
+
+  for (const p of positions) {
+    const index = readInsightIndexFromMarks(doc.resolve(p).marks());
+    if (index != null) return index;
+  }
+
+  return null;
+}
+
 export function clearSoulCheckHighlights(editor: Editor): void {
   const highlightMark = editor.schema.marks.highlight;
   if (!highlightMark) return;
@@ -78,13 +107,17 @@ export function applySoulCheckHighlights(
   editor.view.dispatch(tr);
 }
 
-export function getInsightIndexAtPos(
+/** Sync glowing active state on editor marks to match the focused AI Hub card. */
+export function syncActiveInsightHighlight(
   editor: Editor,
-  pos: number,
-): number | null {
-  const $pos = editor.state.doc.resolve(pos);
-  const mark = $pos.marks().find((m) => m.type.name === "highlight");
-  if (!mark?.attrs.insightIndex) return null;
-  const index = Number(mark.attrs.insightIndex);
-  return Number.isNaN(index) ? null : index;
+  activeIndex: number | null,
+): void {
+  const root = editor.view?.dom;
+  if (!root) return;
+
+  root.querySelectorAll<HTMLElement>("mark[data-insight-index]").forEach((el) => {
+    const idx = Number(el.dataset.insightIndex);
+    const isActive = activeIndex != null && idx === activeIndex;
+    el.classList.toggle("soul-highlight-active", isActive);
+  });
 }
