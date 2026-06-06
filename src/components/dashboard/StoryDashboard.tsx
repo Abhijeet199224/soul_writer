@@ -79,9 +79,24 @@ export function StoryDashboard({
     [draft, outline, settingNotes, beat, sliderValue],
   );
 
+  const baselineKey = useMemo(
+    () =>
+      JSON.stringify({
+        draftContent: initialWorkspace?.draft_content ?? "",
+        outline: initialWorkspace?.outline_json
+          ? parseOutlineJson(initialWorkspace.outline_json)
+          : defaultOutline,
+        settingNotes: initialWorkspace?.setting_notes ?? "",
+        sceneBeat: initialWorkspace?.scene_beat ?? "",
+        sliderValue: initialWorkspace?.slider_value ?? 50,
+      }),
+    [initialWorkspace],
+  );
+
   const { saveStatus } = useDebouncedWorkspaceSave({
     storyId: story.id,
     snapshot: workspaceSnapshot,
+    baselineKey,
   });
 
   const focusMode = navigatorCollapsed && aiHubCollapsed;
@@ -249,6 +264,7 @@ export function StoryDashboard({
           ghostwriteResult={ghostwriteResult}
           linkedNames={linkedNames}
           loading={aiLoading}
+          selectionLoading={selectionLoading}
           error={aiError}
           charactersCount={characters.length}
           onRunSoulCheck={() => runAi("soul-check")}

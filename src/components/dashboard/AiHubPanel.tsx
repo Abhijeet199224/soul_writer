@@ -36,6 +36,7 @@ interface AiHubPanelProps {
   ghostwriteResult: GhostwriteAiResult | null;
   linkedNames: string[];
   loading: AiHubTab | null;
+  selectionLoading?: boolean;
   error: string | null;
   charactersCount: number;
   onRunSoulCheck: () => void;
@@ -76,6 +77,7 @@ export function AiHubPanel({
   ghostwriteResult,
   linkedNames,
   loading,
+  selectionLoading = false,
   error,
   charactersCount,
   onRunSoulCheck,
@@ -83,7 +85,10 @@ export function AiHubPanel({
 }: AiHubPanelProps) {
   const activeResult =
     activeTab === "soul-check" ? soulCheckResult : ghostwriteResult;
-  const isLoading = loading === activeTab;
+  const isLoading =
+    loading === activeTab ||
+    (activeTab === "soul-check" && selectionLoading);
+  const isBusy = loading !== null || selectionLoading;
 
   if (collapsed) {
     return (
@@ -145,7 +150,7 @@ export function AiHubPanel({
         <button
           type="button"
           onClick={activeTab === "soul-check" ? onRunSoulCheck : onRunGhostwrite}
-          disabled={loading !== null || charactersCount === 0}
+          disabled={isBusy || charactersCount === 0}
           className={`w-full rounded-xl px-4 py-2.5 text-sm font-medium transition disabled:opacity-60 ${
             activeTab === "soul-check"
               ? "border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
@@ -193,7 +198,11 @@ export function AiHubPanel({
           <div>
             <div className="mb-3 flex items-center gap-2 text-xs text-amber-800">
               <Sparkles className="h-3.5 w-3.5 animate-pulse" />
-              <span>Gemini is reading your prose…</span>
+              <span>
+                {selectionLoading && activeTab === "soul-check"
+                  ? "Soul Checker is reading your selection…"
+                  : "Gemini is reading your prose…"}
+              </span>
             </div>
             <InsightSkeleton />
           </div>

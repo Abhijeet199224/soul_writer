@@ -18,16 +18,21 @@ interface UseDebouncedWorkspaceSaveOptions {
   storyId: string;
   snapshot: WorkspaceSnapshot;
   enabled?: boolean;
+  /** Server-loaded snapshot — avoids "Unsaved changes" flash on first paint */
+  baselineKey?: string;
 }
 
 export function useDebouncedWorkspaceSave({
   storyId,
   snapshot,
   enabled = true,
+  baselineKey,
 }: UseDebouncedWorkspaceSaveOptions) {
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>(
+    baselineKey ? "saved" : "idle",
+  );
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSavedRef = useRef<string>("");
+  const lastSavedRef = useRef<string>(baselineKey ?? "");
   const snapshotRef = useRef(snapshot);
 
   useEffect(() => {
