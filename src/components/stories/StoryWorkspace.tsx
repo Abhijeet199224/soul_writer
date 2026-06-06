@@ -60,7 +60,7 @@ export function StoryWorkspace({ story, initialCharacters }: StoryWorkspaceProps
           onCharactersChange={setCharacters}
         />
       ) : (
-        <SmartCodexEditor characters={characters} />
+        <SmartCodexEditor storyId={story.id} characters={characters} />
       )}
     </div>
   );

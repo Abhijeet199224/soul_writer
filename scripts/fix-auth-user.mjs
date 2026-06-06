@@ -92,7 +92,7 @@ async function deleteUser(email) {
 async function resetUser(email, password) {
   await deleteUser(email).catch(() => {});
 
-  const { data, error } = await admin.auth.admin.createUser({
+  const { error } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,

@@ -11,6 +11,7 @@ A wholesome writer app with **Context Interconnectivity** — character profiles
 - Dashboard to create and open stories
 - Character Bible with structured profiles (name, role, age, appearance, flaw, motivation)
 - Smart Codex Editor — character names underline and open a hover card from the bible
+- **Ghostwriter Slider** + **Soul Checker** — Gemini API routes pull character context from Supabase automatically
 
 ## Quick start
 
@@ -68,7 +69,18 @@ npm run auth:reset -- your@email.com yournewpassword
 
 3. **Or SQL:** Run the delete block in `supabase/fix-unconfirmed-users.sql` (replace with your email).
 
-### 5. Run the app
+### 5. Enable Gemini (Ghostwriter + Soul Checker)
+
+1. Get an API key from [Google AI Studio](https://aistudio.google.com/apikey)
+2. Add to `.env.local`:
+
+```bash
+GEMINI_API_KEY=your_key_here
+```
+
+The `/api/ai` route fetches characters from your story in Supabase and injects them into every Gemini prompt — no manual copy-paste.
+
+### 6. Run the app
 
 ```bash
 npm install
@@ -86,9 +98,9 @@ Story Bible (characters table)
         ▼
 Smart Codex Editor (name detection + hover cards)
         │
-        │ Step 2 & 3 (planned)
+        │ Step 2 & 3
         ▼
-Ghostwriter Slider + Soul Checker
+Ghostwriter Slider + Soul Checker (Gemini + /api/ai)
 ```
 
 ## Scripts
