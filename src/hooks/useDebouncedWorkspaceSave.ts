@@ -1,49 +1,59 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { OutlineBeat } from "@/lib/story-notes";
 import type { SaveStatus } from "@/lib/types";
 
 const DRAFT_DEBOUNCE_MS = 1500;
 const META_DEBOUNCE_MS = 600;
 
-export interface WorkspaceSnapshot {
+export interface ChapterSaveSnapshot {
+  chapterId: string;
   draftContent: string;
-  outline: OutlineBeat[];
-  settingNotes: string;
   sceneBeat: string;
+  plotObjectives?: string;
+}
+
+export interface StoryMetaSnapshot {
+  storyId: string;
+  activeChapterId: string;
+  settingNotes: string;
   sliderValue: number;
 }
 
-interface UseDebouncedWorkspaceSaveOptions {
-  storyId: string;
-  snapshot: WorkspaceSnapshot;
+interface UseDebouncedChapterSaveOptions {
+  chapterSnapshot: ChapterSaveSnapshot;
+  metaSnapshot: StoryMetaSnapshot;
   enabled?: boolean;
-  /** Server-loaded snapshot — avoids "Unsaved changes" flash on first paint */
   baselineKey?: string;
 }
 
-export function useDebouncedWorkspaceSave({
-  storyId,
-  snapshot,
+export function useDebouncedChapterSave({
+  chapterSnapshot,
+  metaSnapshot,
   enabled = true,
   baselineKey,
-}: UseDebouncedWorkspaceSaveOptions) {
+}: UseDebouncedChapterSaveOptions) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>(
     baselineKey ? "saved" : "idle",
   );
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string>(baselineKey ?? "");
-  const snapshotRef = useRef(snapshot);
-  const lastDraftRef = useRef(snapshot.draftContent);
+  const chapterRef = useRef(chapterSnapshot);
+  const metaRef = useRef(metaSnapshot);
+  const lastDraftRef = useRef(chapterSnapshot.draftContent);
 
   useEffect(() => {
-    snapshotRef.current = snapshot;
-  }, [snapshot]);
+    chapterRef.current = chapterSnapshot;
+  }, [chapterSnapshot]);
+
+  useEffect(() => {
+    metaRef.current = metaSnapshot;
+  }, [metaSnapshot]);
 
   const persist = useCallback(async () => {
-    const current = snapshotRef.current;
-    const payloadKey = JSON.stringify(current);
+    const chapter = chapterRef.current;
+    const meta = metaRef.current;
+    const payloadKey = JSON.stringify({ chapter, meta });
 
     if (payloadKey === lastSavedRef.current) {
       setSaveStatus("saved");
@@ -58,16 +68,18 @@ export function useDebouncedWorkspaceSave({
     setSaveStatus("saving");
 
     try {
-      const response = await fetch("/api/workspace", {
+      const response = await fetch("/api/chapters", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          storyId,
-          draftContent: current.draftContent,
-          outline: current.outline,
-          settingNotes: current.settingNotes,
-          sceneBeat: current.sceneBeat,
-          sliderValue: current.sliderValue,
+          storyId: meta.storyId,
+          chapterId: chapter.chapterId,
+          draftContent: chapter.draftContent,
+          sceneBeat: chapter.sceneBeat,
+          plotObjectives: chapter.plotObjectives,
+          activeChapterId: meta.activeChapterId,
+          settingNotes: meta.settingNotes,
+          sliderValue: meta.sliderValue,
         }),
       });
 
@@ -77,25 +89,30 @@ export function useDebouncedWorkspaceSave({
       }
 
       lastSavedRef.current = payloadKey;
-      lastDraftRef.current = current.draftContent;
+      lastDraftRef.current = chapter.draftContent;
       setSaveStatus("saved");
     } catch {
       setSaveStatus("error");
     }
-  }, [storyId]);
+  }, []);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !chapterSnapshot.chapterId) return;
 
     if (timerRef.current) clearTimeout(timerRef.current);
 
-    const payloadKey = JSON.stringify(snapshot);
+    const payloadKey = JSON.stringify({
+      chapter: chapterSnapshot,
+      meta: metaSnapshot,
+    });
+
     if (payloadKey === lastSavedRef.current) {
       setSaveStatus("saved");
       return;
     }
 
-    const draftChanged = snapshot.draftContent !== lastDraftRef.current;
+    const draftChanged =
+      chapterSnapshot.draftContent !== lastDraftRef.current;
     const delay = draftChanged ? DRAFT_DEBOUNCE_MS : META_DEBOUNCE_MS;
 
     setSaveStatus((current) => (current === "saving" ? current : "idle"));
@@ -107,7 +124,7 @@ export function useDebouncedWorkspaceSave({
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [enabled, snapshot, persist]);
+  }, [enabled, chapterSnapshot, metaSnapshot, persist]);
 
   useEffect(() => {
     function handleOnline() {

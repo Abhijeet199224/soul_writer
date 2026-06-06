@@ -1,33 +1,24 @@
+import type { GhostwriteTier } from "@/lib/types";
 import type { AiMode } from "./prompts";
 import type {
   GhostwriteResult,
   SoulCheckInsight,
   SoulCheckResult,
   SoulCheckSeverity,
+  ToneSuggestions,
 } from "./generate";
 
-/**
- * Strips markdown code fences and safely parses optional JSON from Gemini output.
- */
 export function cleanGeminiText(raw: string): string {
   let text = raw.trim();
-
   const fenced = text.match(/^```(?:json|markdown|text)?\s*\n?([\s\S]*?)\n?```$/i);
-  if (fenced) {
-    text = fenced[1].trim();
-  }
-
+  if (fenced) text = fenced[1].trim();
   const inlineFence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (inlineFence && text.startsWith("```")) {
-    text = inlineFence[1].trim();
-  }
-
+  if (inlineFence && text.startsWith("```")) text = inlineFence[1].trim();
   return text;
 }
 
 export function safeParseGeminiJson<T>(raw: string): T | null {
   const cleaned = cleanGeminiText(raw);
-
   try {
     return JSON.parse(cleaned) as T;
   } catch {
@@ -39,7 +30,6 @@ export function safeParseGeminiJson<T>(raw: string): T | null {
         /* fall through */
       }
     }
-
     const objectMatch = cleaned.match(/\{[\s\S]*\}/);
     if (objectMatch) {
       try {
@@ -53,12 +43,21 @@ export function safeParseGeminiJson<T>(raw: string): T | null {
 }
 
 function isExactSubstring(haystack: string, needle: string): boolean {
-  if (!needle || !haystack) return false;
-  return haystack.includes(needle);
+  return Boolean(needle && haystack && haystack.includes(needle));
 }
 
 function normalizeSeverity(value: unknown): SoulCheckSeverity {
   return value === "lukewarm" ? "lukewarm" : "cold";
+}
+
+function parseToneSuggestions(value: unknown): ToneSuggestions | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const t = value as Record<string, unknown>;
+  const visceral = String(t.visceral ?? "").trim();
+  const subtextual = String(t.subtextual ?? "").trim();
+  const dramatic = String(t.dramatic ?? "").trim();
+  if (!visceral && !subtextual && !dramatic) return undefined;
+  return { visceral, subtextual, dramatic };
 }
 
 function parseInsightItem(
@@ -77,6 +76,7 @@ function parseInsightItem(
     severity: normalizeSeverity(item.severity ?? item.type),
     critique,
     soulPrompt,
+    toneSuggestions: parseToneSuggestions(item.toneSuggestions),
   };
 }
 
@@ -85,29 +85,11 @@ function asSoulCheckResult(
   sourceText: string,
 ): SoulCheckResult {
   let rawItems: unknown[] = [];
-
   if (Array.isArray(parsed)) {
     rawItems = parsed;
   } else if (parsed && typeof parsed === "object") {
     const record = parsed as Record<string, unknown>;
-    if (Array.isArray(record.insights)) {
-      rawItems = record.insights;
-    } else if (Array.isArray(record.coldZones)) {
-      rawItems = record.coldZones.map((zone, index) => {
-        if (typeof zone !== "object" || zone === null) return zone;
-        const z = zone as Record<string, unknown>;
-        const insightIndex = Number(z.insightIndex ?? index);
-        const linked = Array.isArray(record.insights)
-          ? (record.insights[insightIndex] as Record<string, unknown> | undefined)
-          : undefined;
-        return {
-          targetText: z.excerpt ?? z.targetText,
-          severity: z.type ?? z.severity,
-          critique: linked?.body ?? linked?.critique ?? "",
-          soulPrompt: linked?.soulPrompt ?? "",
-        };
-      });
-    }
+    if (Array.isArray(record.insights)) rawItems = record.insights;
   }
 
   const insights = rawItems
@@ -121,22 +103,32 @@ function asSoulCheckResult(
   return { insights };
 }
 
-function asGhostwriteResult(parsed: Record<string, unknown>): GhostwriteResult {
-  const prose =
-    typeof parsed.prose === "string"
-      ? parsed.prose
-      : typeof parsed.text === "string"
-        ? parsed.text
-        : typeof parsed.result === "string"
-          ? parsed.result
-          : "";
+function asGhostwriteResult(
+  parsed: Record<string, unknown>,
+  tier: GhostwriteTier,
+): GhostwriteResult {
+  if (tier === "assist") {
+    return {
+      tier: "assist",
+      structuralAdvice: String(
+        parsed.structuralAdvice ?? parsed.advice ?? parsed.prose ?? "",
+      ).trim(),
+      outlineIdeas: String(parsed.outlineIdeas ?? parsed.outline ?? "").trim(),
+      rationale: String(parsed.rationale ?? ""),
+    };
+  }
 
-  if (!prose.trim()) {
+  const prose = String(
+    parsed.prose ?? parsed.text ?? parsed.result ?? "",
+  ).trim();
+
+  if (!prose) {
     throw new Error("Gemini returned prose without content.");
   }
 
   return {
-    prose: prose.trim(),
+    tier,
+    prose,
     rationale: String(parsed.rationale ?? ""),
   };
 }
@@ -145,22 +137,20 @@ export function normalizeGeminiResult(
   raw: string,
   mode: AiMode,
   sourceText = "",
+  ghostwriteTier: GhostwriteTier = "ghostwriter",
 ): SoulCheckResult | GhostwriteResult {
   const cleaned = cleanGeminiText(raw);
-  if (!cleaned) {
-    throw new Error("Gemini returned an empty response.");
-  }
+  if (!cleaned) throw new Error("Gemini returned an empty response.");
 
   const parsed = safeParseGeminiJson<unknown>(cleaned);
-
   if (parsed !== null) {
     return mode === "soul-check"
       ? asSoulCheckResult(parsed, sourceText)
-      : asGhostwriteResult(parsed as Record<string, unknown>);
+      : asGhostwriteResult(parsed as Record<string, unknown>, ghostwriteTier);
   }
 
   if (mode === "ghostwrite") {
-    return { prose: cleaned, rationale: "" };
+    return { tier: ghostwriteTier, prose: cleaned, rationale: "" };
   }
 
   return { insights: [] };

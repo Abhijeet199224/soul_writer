@@ -46,3 +46,20 @@ export function appendHtmlParagraph(html: string, prose: string): string {
   const base = html?.trim() ? html : "<p></p>";
   return `${base}${paragraph}`;
 }
+
+/** Replace a verbatim plain-text substring inside HTML draft, preserving block structure. */
+export function replaceTargetTextInHtml(
+  html: string,
+  targetText: string,
+  replacement: string,
+): string {
+  const plain = htmlToPlainText(html);
+  if (!plain.includes(targetText)) return html;
+
+  const updatedPlain = plain.replace(targetText, replacement.trim());
+  return normalizeDraftContent(updatedPlain);
+}
+
+export function insertPlainTextAtEnd(html: string, text: string): string {
+  return appendHtmlParagraph(html, text);
+}

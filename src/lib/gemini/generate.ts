@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import type { GhostwriteTier } from "@/lib/types";
 import {
   buildSystemPrompt,
   buildUserPrompt,
@@ -9,7 +10,6 @@ import { normalizeGeminiResult } from "./parse-response";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
 
-/** Curated text-generation models confirmed via Gemini API (June 2026). */
 const DEFAULT_FALLBACK_CHAIN = [
   "gemini-2.5-flash",
   "gemini-2.5-flash-lite",
@@ -21,11 +21,18 @@ const DEFAULT_FALLBACK_CHAIN = [
 
 export type SoulCheckSeverity = "cold" | "lukewarm";
 
+export interface ToneSuggestions {
+  visceral: string;
+  subtextual: string;
+  dramatic: string;
+}
+
 export interface SoulCheckInsight {
   targetText: string;
   severity: SoulCheckSeverity;
   critique: string;
   soulPrompt: string;
+  toneSuggestions?: ToneSuggestions;
 }
 
 export interface SoulCheckResult {
@@ -33,7 +40,10 @@ export interface SoulCheckResult {
 }
 
 export interface GhostwriteResult {
-  prose: string;
+  tier: GhostwriteTier;
+  prose?: string;
+  structuralAdvice?: string;
+  outlineIdeas?: string;
   rationale: string;
 }
 
@@ -96,7 +106,7 @@ async function generateTextWithModel(
     systemInstruction: buildSystemPrompt(ctx, mode),
     generationConfig: {
       temperature: Math.min(0.3 + ctx.sliderValue / 200, 1),
-      maxOutputTokens: mode === "soul-check" ? 2048 : 4096,
+      maxOutputTokens: mode === "soul-check" ? 3072 : 4096,
       responseMimeType: "application/json",
     },
   });
@@ -130,7 +140,7 @@ export async function generateWithGemini(
         console.warn(`[Gemini] Recovered using fallback model: ${modelName}`);
       }
 
-      return normalizeGeminiResult(text, mode, sourceText);
+      return normalizeGeminiResult(text, mode, sourceText, ctx.ghostwriteTier);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       const hasFallback = index < modelChain.length - 1;

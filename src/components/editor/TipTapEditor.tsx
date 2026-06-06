@@ -22,6 +22,11 @@ import {
   syncActiveInsightHighlight,
 } from "@/lib/soul-check-highlights";
 
+export interface TipTapEditorHandle {
+  getCursorPrefix: () => string;
+  insertAtCursor: (text: string) => void;
+}
+
 interface TipTapEditorProps {
   content: string;
   onUpdate: (html: string) => void;
@@ -31,6 +36,7 @@ interface TipTapEditorProps {
   onSelectionSoulCheck?: (selectedText: string) => void;
   selectionLoading?: boolean;
   placeholder?: string;
+  onEditorReady?: (handle: TipTapEditorHandle | null) => void;
 }
 
 function MenuButton({
@@ -69,118 +75,135 @@ export function TipTapEditor({
   onSelectionSoulCheck,
   selectionLoading = false,
   placeholder = "Write your scene…",
+  onEditorReady,
 }: TipTapEditorProps) {
-  const highlightHandlerRef = useRef(onHighlightInsight);
-  const lastSelectionInsightRef = useRef<number | null>(null);
+    const highlightHandlerRef = useRef(onHighlightInsight);
+    const lastSelectionInsightRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    highlightHandlerRef.current = onHighlightInsight;
-  }, [onHighlightInsight]);
+    useEffect(() => {
+      highlightHandlerRef.current = onHighlightInsight;
+    }, [onHighlightInsight]);
 
-  const editor = useEditor({
-    immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3, 4, 5, 6] },
-      }),
-      SoulHighlight.configure({ multicolor: true }),
-    ],
-    content: normalizeDraftContent(content),
-    onUpdate: ({ editor: ed }) => {
-      onUpdate(ed.getHTML());
-    },
-    onSelectionUpdate: ({ editor: ed }) => {
-      const { from, to } = ed.state.selection;
-      if (from !== to) return;
-
-      const index = getInsightIndexAtPos(ed, from);
-      if (index == null || index === lastSelectionInsightRef.current) return;
-
-      lastSelectionInsightRef.current = index;
-      highlightHandlerRef.current?.(index);
-    },
-    editorProps: {
-      attributes: {
-        class:
-          "tiptap-manuscript min-h-[320px] px-8 py-6 font-serif text-lg leading-relaxed tracking-wide text-stone-800 outline-none",
-        "data-placeholder": placeholder,
+    const editor = useEditor({
+      immediatelyRender: false,
+      extensions: [
+        StarterKit.configure({
+          heading: { levels: [1, 2, 3, 4, 5, 6] },
+        }),
+        SoulHighlight.configure({ multicolor: true }),
+      ],
+      content: normalizeDraftContent(content),
+      onUpdate: ({ editor: ed }) => {
+        onUpdate(ed.getHTML());
       },
-    },
-  });
-
-  useEffect(() => {
-    if (!editor) return;
-    editor.setOptions({
+      onSelectionUpdate: ({ editor: ed }) => {
+        const { from, to } = ed.state.selection;
+        if (from !== to) return;
+        const index = getInsightIndexAtPos(ed, from);
+        if (index == null || index === lastSelectionInsightRef.current) return;
+        lastSelectionInsightRef.current = index;
+        highlightHandlerRef.current?.(index);
+      },
       editorProps: {
-        ...editor.options.editorProps,
-        handleClick: (_view, pos) => {
-          const index = getInsightIndexAtPos(editor, pos);
-          if (index != null) {
-            lastSelectionInsightRef.current = index;
-            highlightHandlerRef.current?.(index);
-            return true;
-          }
-          return false;
+        attributes: {
+          class:
+            "tiptap-manuscript min-h-[320px] px-8 py-6 font-serif text-lg leading-relaxed tracking-wide text-stone-800 outline-none",
+          "data-placeholder": placeholder,
         },
       },
     });
-  }, [editor]);
 
-  useEffect(() => {
-    if (!editor || editor.isDestroyed) return;
-    const normalized = normalizeDraftContent(content);
-    if (normalized !== editor.getHTML()) {
-      editor.commands.setContent(normalized, { emitUpdate: false });
-    }
-  }, [content, editor]);
+    useEffect(() => {
+      if (!onEditorReady) return;
+      if (!editor) {
+        onEditorReady(null);
+        return;
+      }
+      onEditorReady({
+        getCursorPrefix: () => {
+          const { from } = editor.state.selection;
+          return editor.state.doc.textBetween(0, from, "\n");
+        },
+        insertAtCursor: (text: string) => {
+          if (!text.trim()) return;
+          editor.chain().focus().insertContent(text).run();
+        },
+      });
+      return () => onEditorReady(null);
+    }, [editor, onEditorReady]);
 
-  const appliedInsightsRef = useRef("");
+    useEffect(() => {
+      if (!editor) return;
+      editor.setOptions({
+        editorProps: {
+          ...editor.options.editorProps,
+          handleClick: (_view, pos) => {
+            const index = getInsightIndexAtPos(editor, pos);
+            if (index != null) {
+              lastSelectionInsightRef.current = index;
+              highlightHandlerRef.current?.(index);
+              return true;
+            }
+            return false;
+          },
+        },
+      });
+    }, [editor]);
 
-  useEffect(() => {
-    if (!editor || editor.isDestroyed) return;
-    const key = JSON.stringify(soulCheckInsights);
-    if (key === appliedInsightsRef.current) return;
-    appliedInsightsRef.current = key;
+    useEffect(() => {
+      if (!editor || editor.isDestroyed) return;
+      const normalized = normalizeDraftContent(content);
+      if (normalized !== editor.getHTML()) {
+        editor.commands.setContent(normalized, { emitUpdate: false });
+      }
+    }, [content, editor]);
 
-    if (!soulCheckInsights.length) {
-      clearSoulCheckHighlights(editor);
-      return;
-    }
+    const appliedInsightsRef = useRef("");
 
-    applySoulCheckHighlights(editor, soulCheckInsights);
-    syncActiveInsightHighlight(editor, activeInsightIndex);
-  }, [editor, soulCheckInsights, activeInsightIndex]);
+    useEffect(() => {
+      if (!editor || editor.isDestroyed) return;
+      const key = JSON.stringify(soulCheckInsights);
+      if (key === appliedInsightsRef.current) return;
+      appliedInsightsRef.current = key;
 
-  useEffect(() => {
-    if (!editor || editor.isDestroyed) return;
-    syncActiveInsightHighlight(editor, activeInsightIndex);
-  }, [editor, activeInsightIndex]);
+      if (!soulCheckInsights.length) {
+        clearSoulCheckHighlights(editor);
+        return;
+      }
 
-  const runSoulCheckOnSelection = useCallback(() => {
-    if (!editor || !onSelectionSoulCheck) return;
-    const { from, to } = editor.state.selection;
-    if (from === to) return;
-    const selected = editor.state.doc.textBetween(from, to, "\n").trim();
-    if (selected.length >= 3) {
-      onSelectionSoulCheck(selected);
-    }
-  }, [editor, onSelectionSoulCheck]);
+      applySoulCheckHighlights(editor, soulCheckInsights);
+      syncActiveInsightHighlight(editor, activeInsightIndex);
+    }, [editor, soulCheckInsights, activeInsightIndex]);
 
-  if (!editor) {
-    return (
-      <div className="tiptap-shell flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
-        <div className="min-h-[320px] animate-pulse px-8 py-6">
-          <div className="h-4 w-1/3 rounded bg-stone-100" />
-          <div className="mt-4 h-4 w-full rounded bg-stone-50" />
-          <div className="mt-2 h-4 w-5/6 rounded bg-stone-50" />
+    useEffect(() => {
+      if (!editor || editor.isDestroyed) return;
+      syncActiveInsightHighlight(editor, activeInsightIndex);
+    }, [editor, activeInsightIndex]);
+
+    const runSoulCheckOnSelection = useCallback(() => {
+      if (!editor || !onSelectionSoulCheck) return;
+      const { from, to } = editor.state.selection;
+      if (from === to) return;
+      const selected = editor.state.doc.textBetween(from, to, "\n").trim();
+      if (selected.length >= 3) {
+        onSelectionSoulCheck(selected);
+      }
+    }, [editor, onSelectionSoulCheck]);
+
+    if (!editor) {
+      return (
+        <div className="tiptap-shell flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+          <div className="min-h-[320px] animate-pulse px-8 py-6">
+            <div className="h-4 w-1/3 rounded bg-stone-100" />
+            <div className="mt-4 h-4 w-full rounded bg-stone-50" />
+            <div className="mt-2 h-4 w-5/6 rounded bg-stone-50" />
+          </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  return (
-    <div className="tiptap-shell relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
-      {editor && (
+    return (
+      <div className="tiptap-shell relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
         <BubbleMenu
           editor={editor}
           className="flex items-center gap-0.5 rounded-xl border border-stone-700/80 bg-stone-900/95 px-1.5 py-1 shadow-xl shadow-stone-900/30 backdrop-blur-sm"
@@ -239,11 +262,10 @@ export function TipTapEditor({
             </>
           )}
         </BubbleMenu>
-      )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto scroll-smooth">
-        <EditorContent editor={editor} className="h-full" />
+        <div className="min-h-0 flex-1 overflow-y-auto scroll-smooth">
+          <EditorContent editor={editor} className="h-full" />
+        </div>
       </div>
-    </div>
-  );
+    );
 }

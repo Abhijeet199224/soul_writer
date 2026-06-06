@@ -1,80 +1,57 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo } from "react";
-import type { Character, SaveStatus, Story } from "@/lib/types";
-import type { SoulCheckInsight } from "@/lib/gemini/generate";
+import { useMemo, useState } from "react";
+import type { Character } from "@/lib/types";
 import { htmlToPlainText } from "@/lib/draft-content";
 import { splitTextByCharacters } from "@/lib/character-highlight";
 import { CharacterHoverCard } from "@/components/editor/CharacterHoverCard";
 import { SaveStatusIndicator } from "@/components/editor/SaveStatusIndicator";
 import { EditorSkeleton } from "@/components/editor/EditorSkeleton";
-
+import { useStoryEngine } from "@/context/StoryEngineContext";
+import { getGhostwriteTier } from "@/lib/chapters";
 const TipTapEditor = dynamic(
   () =>
     import("@/components/editor/TipTapEditor").then((mod) => mod.TipTapEditor),
   { ssr: false, loading: () => <EditorSkeleton /> },
 );
 
-interface WritingCanvasProps {
-  story: Story;
-  draft: string;
-  onDraftChange: (value: string) => void;
-  sliderValue: number;
-  onSliderChange: (value: number) => void;
-  beat: string;
-  onBeatChange: (value: string) => void;
-  characters: Character[];
-  activeCharacter: Character | null;
-  anchorRect: DOMRect | null;
-  onCharacterClick: (
-    character: Character,
-    event: React.MouseEvent<HTMLButtonElement>,
-  ) => void;
-  onClearHover: () => void;
-  saveStatus: SaveStatus;
-  focusMode: boolean;
-  onSelectionSoulCheck: (selectedText: string) => Promise<void>;
-  selectionLoading: boolean;
-  soulCheckInsights?: SoulCheckInsight[];
-  activeInsightIndex?: number | null;
-  onHighlightInsight?: (insightIndex: number) => void;
-}
-
 function sliderLabel(value: number) {
-  if (value <= 25) return "Inspiration";
-  if (value <= 50) return "Brainstorm";
-  if (value <= 75) return "Co-Drafting";
+  if (value <= 30) return "Human Assist";
+  if (value <= 70) return "Co-Pilot";
   return "Ghostwriter";
 }
 
-export function WritingCanvas({
-  story,
-  draft,
-  onDraftChange,
-  sliderValue,
-  onSliderChange,
-  beat,
-  onBeatChange,
-  characters,
-  activeCharacter,
-  anchorRect,
-  onCharacterClick,
-  onClearHover,
-  saveStatus,
-  focusMode,
-  onSelectionSoulCheck,
-  selectionLoading,
-  soulCheckInsights = [],
-  activeInsightIndex = null,
-  onHighlightInsight,
-}: WritingCanvasProps) {
-  const plainDraft = useMemo(() => htmlToPlainText(draft), [draft]);
+export function WritingCanvas() {
+  const {
+    story,
+    activeChapter,
+    draft,
+    beat,
+    sliderValue,
+    saveStatus,
+    focusMode,
+    characters,
+    soulCheckInsights,
+    activeInsightIndex,
+    selectionLoading,
+    updateDraft,
+    setBeat,
+    setSliderValue,
+    onHighlightInsight,
+    runSelectionSoulCheck,
+    registerEditor,
+  } = useStoryEngine();
 
+  const [activeCharacter, setActiveCharacter] = useState<Character | null>(null);
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+
+  const plainDraft = useMemo(() => htmlToPlainText(draft), [draft]);
   const segments = useMemo(
     () => splitTextByCharacters(plainDraft, characters),
     [plainDraft, characters],
   );
+  const ghostTier = getGhostwriteTier(sliderValue);
 
   return (
     <section
@@ -88,8 +65,10 @@ export function WritingCanvas({
             <p className="truncate font-serif text-lg text-stone-900">
               {story.title}
             </p>
-            {story.synopsis && (
-              <p className="truncate text-xs text-stone-500">{story.synopsis}</p>
+            {activeChapter && (
+              <p className="truncate text-xs text-stone-500">
+                {activeChapter.act}: {activeChapter.title}
+              </p>
             )}
           </div>
           <SaveStatusIndicator status={saveStatus} />
@@ -110,14 +89,24 @@ export function WritingCanvas({
               min={0}
               max={100}
               value={sliderValue}
-              onChange={(event) => onSliderChange(Number(event.target.value))}
+              onChange={(event) =>
+                setSliderValue(Number(event.target.value))
+              }
               className="w-full accent-amber-700"
             />
+            <p className="mt-1 text-[10px] text-stone-400">
+              {ghostTier === "assist" &&
+                "Generate shows ideas in sidebar only — no canvas writes."}
+              {ghostTier === "copilot" &&
+                "Generate completes your current sentence at the cursor."}
+              {ghostTier === "ghostwriter" &&
+                "Generate drafts 200–300 words on the canvas."}
+            </p>
           </div>
           <input
             type="text"
             value={beat}
-            onChange={(event) => onBeatChange(event.target.value)}
+            onChange={(event) => setBeat(event.target.value)}
             placeholder="Scene beat (optional)"
             className="min-w-[220px] flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm outline-none focus:border-amber-400"
           />
@@ -126,17 +115,15 @@ export function WritingCanvas({
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-5">
         <TipTapEditor
+          onEditorReady={registerEditor}
           content={draft}
-          onUpdate={(html) => {
-            onDraftChange(html);
-            onClearHover();
-          }}
+          onUpdate={updateDraft}
           soulCheckInsights={soulCheckInsights}
           activeInsightIndex={activeInsightIndex}
           onHighlightInsight={onHighlightInsight}
-          onSelectionSoulCheck={(text) => void onSelectionSoulCheck(text)}
+          onSelectionSoulCheck={(text) => void runSelectionSoulCheck(text)}
           selectionLoading={selectionLoading}
-          placeholder="Write your scene. Select text for formatting or Soul Check…"
+          placeholder="Write this chapter. Select text for Soul Check…"
         />
 
         {!focusMode && (
@@ -149,7 +136,10 @@ export function WritingCanvas({
                 <button
                   key={`${segment.text}-${index}`}
                   type="button"
-                  onClick={(event) => onCharacterClick(segment.character!, event)}
+                  onClick={(event) => {
+                    setActiveCharacter(segment.character!);
+                    setAnchorRect(event.currentTarget.getBoundingClientRect());
+                  }}
                   className="border-b-2 border-amber-500/80 bg-amber-100/50 px-0.5 font-medium text-amber-900 underline decoration-amber-600 decoration-2 underline-offset-4 hover:bg-amber-200/60"
                 >
                   {segment.text}

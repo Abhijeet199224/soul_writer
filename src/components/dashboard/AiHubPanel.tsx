@@ -7,6 +7,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { GhostwriteResult, SoulCheckInsight } from "@/lib/gemini/generate";
+import { useStoryEngine } from "@/context/StoryEngineContext";
+import { getGhostwriteTier } from "@/lib/chapters";
 
 export interface SoulCheckAiResult {
   kind: "soul-check";
@@ -22,27 +24,6 @@ export interface GhostwriteAiResult {
   charactersUsed: string[];
   sliderValue: number;
   timestamp: number;
-}
-
-export type AiResult = SoulCheckAiResult | GhostwriteAiResult;
-
-type AiHubTab = "soul-check" | "ghostwrite";
-
-interface AiHubPanelProps {
-  collapsed: boolean;
-  onToggleCollapse: () => void;
-  activeTab: AiHubTab;
-  onTabChange: (tab: AiHubTab) => void;
-  soulCheckResult: SoulCheckAiResult | null;
-  ghostwriteResult: GhostwriteAiResult | null;
-  linkedNames: string[];
-  loading: AiHubTab | null;
-  selectionLoading?: boolean;
-  activeInsightIndex?: number | null;
-  error: string | null;
-  charactersCount: number;
-  onRunSoulCheck: () => void;
-  onRunGhostwrite: () => void;
 }
 
 function InsightSkeleton() {
@@ -80,12 +61,16 @@ function SoulCheckInsightCard({
   index,
   isActive,
   cardRef,
+  onApplyTone,
 }: {
   insight: SoulCheckInsight;
   index: number;
   isActive: boolean;
   cardRef: (element: HTMLElement | null) => void;
+  onApplyTone: (target: string, replacement: string) => void;
 }) {
+  const tones = insight.toneSuggestions;
+
   return (
     <article
       ref={cardRef}
@@ -121,47 +106,78 @@ function SoulCheckInsightCard({
           {insight.soulPrompt}
         </p>
       </div>
+
+      {tones && (
+        <div className="mt-4 space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
+            Fast Tone Rewrites
+          </p>
+          <div className="flex flex-col gap-2">
+            {(
+              [
+                ["visceral", "Visceral", tones.visceral],
+                ["subtextual", "Subtextual", tones.subtextual],
+                ["dramatic", "Dramatic", tones.dramatic],
+              ] as const
+            )
+              .filter(([, , text]) => text?.trim())
+              .map(([key, label, text]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => onApplyTone(insight.targetText, text)}
+                  className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-left text-xs text-stone-700 transition hover:border-amber-300 hover:bg-amber-50/60"
+                >
+                  <span className="font-semibold text-amber-800">{label}</span>
+                  <span className="mt-1 block font-serif italic leading-relaxed">
+                    {text}
+                  </span>
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
     </article>
   );
 }
 
-export function AiHubPanel({
-  collapsed,
-  onToggleCollapse,
-  activeTab,
-  onTabChange,
-  soulCheckResult,
-  ghostwriteResult,
-  linkedNames,
-  loading,
-  selectionLoading = false,
-  activeInsightIndex = null,
-  error,
-  charactersCount,
-  onRunSoulCheck,
-  onRunGhostwrite,
-}: AiHubPanelProps) {
+function ghostwriteButtonLabel(sliderValue: number, loading: boolean) {
+  const tier = getGhostwriteTier(sliderValue);
+  if (loading) {
+    if (tier === "assist") return "Analyzing structure…";
+    if (tier === "copilot") return "Completing sentence…";
+    return "Ghostwriting…";
+  }
+  if (tier === "assist") return "Generate ideas (sidebar only)";
+  if (tier === "copilot") return "Complete at cursor";
+  return "Generate next 200–300 words";
+}
+
+export function AiHubPanel() {
+  const engine = useStoryEngine();
   const cardRefs = useRef<(HTMLElement | null)[]>([]);
 
   const activeResult =
-    activeTab === "soul-check" ? soulCheckResult : ghostwriteResult;
+    engine.aiTab === "soul-check"
+      ? engine.soulCheckResult
+      : engine.ghostwriteResult;
   const isLoading =
-    loading === activeTab ||
-    (activeTab === "soul-check" && selectionLoading);
-  const isBusy = loading !== null || selectionLoading;
+    engine.aiLoading === engine.aiTab ||
+    (engine.aiTab === "soul-check" && engine.selectionLoading);
+  const isBusy = engine.aiLoading !== null || engine.selectionLoading;
 
   useEffect(() => {
-    if (activeInsightIndex == null) return;
-    const card = cardRefs.current[activeInsightIndex];
+    if (engine.activeInsightIndex == null) return;
+    const card = cardRefs.current[engine.activeInsightIndex];
     card?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [activeInsightIndex]);
+  }, [engine.activeInsightIndex]);
 
-  if (collapsed) {
+  if (engine.aiHubCollapsed) {
     return (
       <aside className="flex w-12 shrink-0 flex-col items-center border-l border-stone-200 bg-white py-4 transition-all duration-300 ease-in-out">
         <button
           type="button"
-          onClick={onToggleCollapse}
+          onClick={() => engine.setAiHubCollapsed(false)}
           title="Expand AI Hub"
           className="rounded-lg p-2 text-stone-500 transition hover:bg-stone-100 hover:text-stone-900"
         >
@@ -179,7 +195,7 @@ export function AiHubPanel({
         </p>
         <button
           type="button"
-          onClick={onToggleCollapse}
+          onClick={() => engine.setAiHubCollapsed(true)}
           title="Collapse AI Hub"
           className="rounded-lg p-1.5 text-stone-500 transition hover:bg-stone-100 hover:text-stone-900"
         >
@@ -190,9 +206,9 @@ export function AiHubPanel({
       <div className="flex border-b border-stone-100 p-2">
         <button
           type="button"
-          onClick={() => onTabChange("soul-check")}
+          onClick={() => engine.setAiTab("soul-check")}
           className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition ${
-            activeTab === "soul-check"
+            engine.aiTab === "soul-check"
               ? "bg-amber-100 text-amber-900"
               : "text-stone-500 hover:bg-stone-50"
           }`}
@@ -201,9 +217,9 @@ export function AiHubPanel({
         </button>
         <button
           type="button"
-          onClick={() => onTabChange("ghostwrite")}
+          onClick={() => engine.setAiTab("ghostwrite")}
           className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition ${
-            activeTab === "ghostwrite"
+            engine.aiTab === "ghostwrite"
               ? "bg-stone-900 text-white"
               : "text-stone-500 hover:bg-stone-50"
           }`}
@@ -215,35 +231,30 @@ export function AiHubPanel({
       <div className="border-b border-stone-100 p-4">
         <button
           type="button"
-          onClick={activeTab === "soul-check" ? onRunSoulCheck : onRunGhostwrite}
-          disabled={isBusy || charactersCount === 0}
+          onClick={() =>
+            engine.aiTab === "soul-check"
+              ? void engine.runSoulCheck()
+              : void engine.runGhostwrite()
+          }
+          disabled={isBusy || engine.characters.length === 0}
           className={`w-full rounded-xl px-4 py-2.5 text-sm font-medium transition disabled:opacity-60 ${
-            activeTab === "soul-check"
+            engine.aiTab === "soul-check"
               ? "border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
               : "bg-stone-900 text-white hover:bg-stone-800"
           }`}
         >
-          {loading === activeTab
-            ? activeTab === "soul-check"
+          {engine.aiLoading === engine.aiTab
+            ? engine.aiTab === "soul-check"
               ? "Checking soul…"
-              : "Ghostwriting…"
-            : activeTab === "soul-check"
-              ? "Run Soul Check (full draft)"
-              : "Generate"}
+              : ghostwriteButtonLabel(engine.sliderValue, true)
+            : engine.aiTab === "soul-check"
+              ? "Run Soul Check (chapter)"
+              : ghostwriteButtonLabel(engine.sliderValue, false)}
         </button>
 
-        <p className="mt-2 text-[10px] text-stone-400">
-          Tip: highlight a passage in the editor for a targeted Soul Check.
-        </p>
-
-        {charactersCount === 0 && (
-          <p className="mt-2 text-xs text-red-600">
-            Add characters in the Navigator first.
-          </p>
-        )}
-        {error && (
+        {engine.aiError && (
           <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-            {error}
+            {engine.aiError}
           </p>
         )}
 
@@ -252,10 +263,15 @@ export function AiHubPanel({
             Story bible injected
           </p>
           <p className="mt-1 text-xs text-stone-600">
-            {linkedNames.length > 0
-              ? linkedNames.join(", ")
+            {engine.linkedNames.length > 0
+              ? engine.linkedNames.join(", ")
               : "All bible characters (none named in draft)"}
           </p>
+          {engine.activeChapter && (
+            <p className="mt-1 text-[10px] text-amber-700">
+              Chapter context: {engine.activeChapter.act}
+            </p>
+          )}
         </div>
       </div>
 
@@ -264,11 +280,7 @@ export function AiHubPanel({
           <div>
             <div className="mb-3 flex items-center gap-2 text-xs text-amber-800">
               <Sparkles className="h-3.5 w-3.5 animate-pulse" />
-              <span>
-                {selectionLoading && activeTab === "soul-check"
-                  ? "Literary Editor is reading your selection…"
-                  : "Gemini is auditing your prose…"}
-              </span>
+              <span>Gemini is reading your chapter…</span>
             </div>
             <InsightSkeleton />
           </div>
@@ -279,10 +291,6 @@ export function AiHubPanel({
                 <p className="font-serif text-base text-emerald-900">
                   ✨ Voice is solid! No flat spots detected.
                 </p>
-                <p className="mt-2 text-xs text-emerald-700/80">
-                  {activeResult.charactersUsed.join(", ")} ·{" "}
-                  {activeResult.sliderValue}%
-                </p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -291,30 +299,53 @@ export function AiHubPanel({
                     key={`${insight.targetText}-${index}`}
                     insight={insight}
                     index={index}
-                    isActive={activeInsightIndex === index}
+                    isActive={engine.activeInsightIndex === index}
                     cardRef={(element) => {
                       cardRefs.current[index] = element;
                     }}
+                    onApplyTone={engine.applyToneRewrite}
                   />
                 ))}
-                <p className="text-[10px] text-stone-400">
-                  {activeResult.charactersUsed.join(", ")} ·{" "}
-                  {activeResult.sliderValue}%
-                </p>
               </div>
             )
+          ) : activeResult.data.tier === "assist" ? (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                  Structural advice (sidebar only)
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-stone-700">
+                  {activeResult.data.structuralAdvice}
+                </p>
+              </div>
+              {activeResult.data.outlineIdeas && (
+                <div className="rounded-xl border border-dashed border-amber-200 bg-amber-50/40 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                    Scene ideas to write manually
+                  </p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-stone-700">
+                    {activeResult.data.outlineIdeas}
+                  </p>
+                </div>
+              )}
+              {activeResult.data.rationale && (
+                <p className="text-xs text-stone-500">
+                  {activeResult.data.rationale}
+                </p>
+              )}
+            </div>
           ) : (
             <div className="rounded-xl border border-stone-200 bg-stone-900 p-4 text-stone-100">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-                Ghostwriter output
+                {activeResult.data.tier === "copilot"
+                  ? "Co-pilot completion"
+                  : "Ghostwriter output"}
               </p>
-              <p className="mt-1 text-[10px] text-stone-400">
-                {activeResult.charactersUsed.join(", ")} ·{" "}
-                {activeResult.sliderValue}%
-              </p>
-              <div className="mt-3 whitespace-pre-wrap font-serif text-sm leading-relaxed text-stone-200">
-                {activeResult.data.prose}
-              </div>
+              {activeResult.data.prose && (
+                <div className="mt-3 whitespace-pre-wrap font-serif text-sm leading-relaxed text-stone-200">
+                  {activeResult.data.prose}
+                </div>
+              )}
               {activeResult.data.rationale && (
                 <p className="mt-3 border-t border-stone-700 pt-3 text-xs text-stone-400">
                   {activeResult.data.rationale}
@@ -326,9 +357,7 @@ export function AiHubPanel({
           <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50 p-6 text-center">
             <Sparkles className="mx-auto mb-2 h-5 w-5 text-amber-400/70" />
             <p className="font-serif text-sm text-stone-600">
-              {activeTab === "soul-check"
-                ? "Highlight text and run Soul Check, or audit the full draft from here."
-                : "Generate prose grounded in your Story Bible."}
+              Run Soul Check or Ghostwriter for this chapter.
             </p>
           </div>
         )}
