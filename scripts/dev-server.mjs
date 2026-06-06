@@ -28,11 +28,16 @@ function portInUse() {
 async function killPort() {
   const { execSync } = await import("node:child_process");
   try {
+    execSync("pkill -f 'next dev' 2>/dev/null", { stdio: "ignore" });
+  } catch {
+    // no matching process
+  }
+  try {
     execSync(`fuser -k ${PORT}/tcp 2>/dev/null`, { stdio: "ignore" });
-    await new Promise((r) => setTimeout(r, 800));
   } catch {
     // nothing listening
   }
+  await new Promise((r) => setTimeout(r, 1200));
 }
 
 if (await portInUse()) {
