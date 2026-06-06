@@ -36,13 +36,9 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const pathname = request.nextUrl.pathname;
-  const isAuthRoute = pathname.startsWith("/login");
-  const isAuthFlowRoute =
-    pathname.startsWith("/auth/callback") ||
-    pathname.startsWith("/auth/check-email");
+  const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
   const isPublicRoute =
-    pathname === "/" || isAuthRoute || isAuthFlowRoute;
+    request.nextUrl.pathname === "/" || isAuthRoute;
 
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();

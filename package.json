@@ -8,8 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:apply": "node scripts/apply-schema.mjs",
-    "setup:check": "node --env-file=.env.local scripts/verify-setup.mjs",
-    "auth:configure": "node --env-file=.env.local scripts/configure-auth-email.mjs"
+    "setup:check": "node --env-file=.env.local scripts/verify-setup.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

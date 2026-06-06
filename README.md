@@ -49,32 +49,15 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key_here
 SUPABASE_DB_URL="postgresql://postgres.[ref]:[password]@..." npm run db:apply
 ```
 
-### 4. Enable email verification (required for sign-up emails)
+### 4. Disable email confirmation (simple login)
 
-Supabase’s **built-in email only sends to org team addresses**. To keep email verification for all users, connect **Resend SMTP**:
+For instant sign-up and sign-in without verification emails:
 
-1. Create a free account at [resend.com](https://resend.com) and copy an API key
-2. Create a Supabase access token at [Account → Tokens](https://supabase.com/dashboard/account/tokens)
-3. Add to `.env.local`:
+1. Open [Authentication → Sign In / Providers → Email](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/providers)
+2. Turn **off** **Confirm email**
+3. Save
 
-```bash
-NEXT_PUBLIC_SITE_URL=http://localhost:3001
-SUPABASE_ACCESS_TOKEN=your_supabase_access_token
-RESEND_API_KEY=re_your_resend_api_key
-SMTP_SENDER_EMAIL=onboarding@resend.dev
-```
-
-4. Run:
-
-```bash
-npm run auth:configure
-```
-
-This enables **Confirm email**, sets Resend SMTP, and registers `http://localhost:3001/auth/callback` as the redirect URL.
-
-**Manual alternative:** [Authentication → Email → SMTP Settings](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/smtp) with host `smtp.resend.com`, port `465`, user `resend`, password = your Resend API key.
-
-For production, verify your own domain in Resend and set `SMTP_SENDER_EMAIL=noreply@yourdomain.com`.
+If you already signed up before this change, delete the old user under [Authentication → Users](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/users) and sign up again.
 
 ### 5. Run the app
 
@@ -83,7 +66,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001), sign up, confirm your email, create a story, add characters, then switch to the Smart Codex Editor tab.
+Open [http://localhost:3001](http://localhost:3001), sign up, create a story, add characters, then switch to the Smart Codex Editor tab.
 
 ## Architecture
 
@@ -107,4 +90,3 @@ Ghostwriter Slider + Soul Checker
 | `npm run build` | Production build |
 | `npm run db:apply` | Apply schema via Postgres URI |
 | `npm run setup:check` | Verify Supabase connection + tables |
-| `npm run auth:configure` | Enable Resend SMTP + email verification |
