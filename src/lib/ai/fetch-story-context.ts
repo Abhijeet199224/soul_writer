@@ -1,13 +1,47 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Character } from "@/lib/types";
+import type { Character, StoryChapter } from "@/lib/types";
 import type { StoryBiblePayload } from "@/lib/story-bible-context";
 import { parseOutlineJson } from "@/lib/story-bible-context";
+import { normalizeChapter } from "@/lib/chapters";
+
+export async function fetchStoryChapter(
+  supabase: SupabaseClient,
+  storyId: string,
+  chapterId?: string | null,
+): Promise<StoryChapter | null> {
+  if (chapterId) {
+    const { data } = await supabase
+      .from("story_chapters")
+      .select("*")
+      .eq("id", chapterId)
+      .eq("story_id", storyId)
+      .maybeSingle();
+    return data ? normalizeChapter(data as Record<string, unknown>) : null;
+  }
+
+  const { data: workspace } = await supabase
+    .from("story_workspace")
+    .select("active_chapter_id")
+    .eq("story_id", storyId)
+    .maybeSingle();
+
+  if (!workspace?.active_chapter_id) return null;
+
+  const { data } = await supabase
+    .from("story_chapters")
+    .select("*")
+    .eq("id", workspace.active_chapter_id)
+    .maybeSingle();
+
+  return data ? normalizeChapter(data as Record<string, unknown>) : null;
+}
 
 export async function fetchStoryBible(
   supabase: SupabaseClient,
   storyId: string,
+  chapterId?: string | null,
 ): Promise<StoryBiblePayload | null> {
-  const [charsRes, workspaceRes] = await Promise.all([
+  const [charsRes, workspaceRes, chapter] = await Promise.all([
     supabase
       .from("characters")
       .select("*")
@@ -15,9 +49,10 @@ export async function fetchStoryBible(
       .order("name"),
     supabase
       .from("story_workspace")
-      .select("outline_json, setting_notes, scene_beat")
+      .select("outline_json, setting_notes, scene_beat, active_chapter_id")
       .eq("story_id", storyId)
       .maybeSingle(),
+    fetchStoryChapter(supabase, storyId, chapterId),
   ]);
 
   if (charsRes.error) {
@@ -26,17 +61,18 @@ export async function fetchStoryBible(
   }
 
   const characters = (charsRes.data ?? []) as Character[];
-
-  if (workspaceRes.error) {
-    console.error("fetchStoryBible workspace:", workspaceRes.error);
-    return { characters, outline: [], settingNotes: "", sceneBeat: "" };
-  }
-
   const ws = workspaceRes.data;
+  const activeChapter =
+    chapter ??
+    (ws?.active_chapter_id
+      ? await fetchStoryChapter(supabase, storyId, ws.active_chapter_id)
+      : null);
+
   return {
     characters,
     outline: parseOutlineJson(ws?.outline_json),
     settingNotes: ws?.setting_notes ?? "",
-    sceneBeat: ws?.scene_beat ?? "",
+    sceneBeat: activeChapter?.scene_beat ?? ws?.scene_beat ?? "",
+    chapter: activeChapter,
   };
 }

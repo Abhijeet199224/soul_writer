@@ -1,157 +1,180 @@
+import type { GhostwriteTier } from "@/lib/types";
 import type { StoryBiblePayload } from "@/lib/story-bible-context";
 import { buildStoryBibleSystemBlock } from "@/lib/story-bible-context";
+import { formatChapterContext } from "@/lib/chapters";
+import type { StoryChapter } from "@/lib/types";
 
 export type AiMode = "ghostwrite" | "soul-check";
 
 export interface PromptContext {
   storyTitle: string;
   bible: StoryBiblePayload;
+  chapter?: StoryChapter | null;
   sliderValue: number;
+  ghostwriteTier?: GhostwriteTier;
   draftContent: string;
-  /** Soul Check: only the highlighted passage */
   selectedText?: string;
-}
-
-function sliderModeLabel(value: number): string {
-  if (value <= 25) return "Inspiration";
-  if (value <= 50) return "Brainstorm";
-  if (value <= 75) return "Co-Drafting";
-  return "Ghostwriter";
+  cursorPrefix?: string;
 }
 
 function soulCheckSliderGuidance(value: number): string {
   if (value <= 25) {
-    return `Collaboration Slider: ${value}/100 (${sliderModeLabel(value)}).
-VOICE PROTECTION MODE — Be gentle and suggestive. Protect the author's original voice.
-Only flag egregious flat spots. Frame critiques as invitations, not directives.
-Prioritize emotional authenticity over craft mechanics.`;
+    return `Collaboration Slider: ${value}/100 — VOICE PROTECTION. Gentle, voice-preserving critiques only.`;
   }
-
   if (value <= 50) {
-    return `Collaboration Slider: ${value}/100 (${sliderModeLabel(value)}).
-BALANCED MODE — Mix voice preservation with clear editorial notes.
-Name specific weaknesses but acknowledge what is working.`;
+    return `Collaboration Slider: ${value}/100 — BALANCED. Mix encouragement with specific editorial notes.`;
   }
-
   if (value <= 75) {
-    return `Collaboration Slider: ${value}/100 (${sliderModeLabel(value)}).
-EDITORIAL MODE — Be direct and specific about structural and emotional weaknesses.
-Dissect subtext, pacing, and resonance with professional rigor.`;
+    return `Collaboration Slider: ${value}/100 — EDITORIAL. Direct structural and emotional analysis.`;
   }
-
-  return `Collaboration Slider: ${value}/100 (${sliderModeLabel(value)}).
-GHOSTWRITER ANALYTICAL MODE — Deliver highly analytical, structural critiques.
-Dissect pacing, subtext, scene architecture, and craft mechanics ruthlessly.
-Treat this as a developmental edit at maximum AI collaboration.`;
+  return `Collaboration Slider: ${value}/100 — GHOSTWRITER ANALYTICAL. Ruthless developmental edit with structural dissection.`;
 }
 
-function ghostwriteSliderGuidance(value: number): string {
-  if (value <= 25) {
-    return `Collaboration Slider: ${value}/100 (${sliderModeLabel(value)}).
-Match the author's existing voice and rhythm exactly. Offer only light continuations.`;
+function ghostwriteTierPrompt(tier: GhostwriteTier, sliderValue: number): string {
+  if (tier === "assist") {
+    return `GHOSTWRITER TIER: PURE HUMAN ASSIST (${sliderValue}/100, 0–30%).
+DO NOT write prose for the manuscript. Return structural advice and outline ideas ONLY for the sidebar.
+The author will write manually. Never output canvas-ready prose.`;
   }
-
-  if (value <= 50) {
-    return `Collaboration Slider: ${value}/100 (${sliderModeLabel(value)}).
-Collaborate evenly — extend the scene while mirroring the author's style.`;
+  if (tier === "copilot") {
+    return `GHOSTWRITER TIER: CO-PILOT (${sliderValue}/100, 31–70%).
+Complete or extend ONLY the author's current sentence at the cursor. Output a short phrase or single sentence (max 30 words).
+Match the author's voice exactly. Do not draft new paragraphs.`;
   }
-
-  if (value <= 75) {
-    return `Collaboration Slider: ${value}/100 (${sliderModeLabel(value)}).
-Take stronger creative guidance while staying canon-consistent with the Story Bible.`;
-  }
-
-  return `Collaboration Slider: ${value}/100 (${sliderModeLabel(value)}).
-Maximum AI creative direction — bold structural and prose choices grounded in the Story Bible.`;
+  return `GHOSTWRITER TIER: FULL GHOSTWRITER (${sliderValue}/100, 71–100%).
+Draft the next 200–300 words advancing the current Act/Chapter plot objectives.
+Bold creative choices grounded in the Story Bible and chapter sequence.`;
 }
 
 export function buildSystemPrompt(ctx: PromptContext, mode: AiMode): string {
   const proseSample = ctx.selectedText ?? ctx.draftContent;
   const bibleBlock = buildStoryBibleSystemBlock(ctx.bible, proseSample);
-  const sliderGuidance =
-    mode === "soul-check"
-      ? soulCheckSliderGuidance(ctx.sliderValue)
-      : ghostwriteSliderGuidance(ctx.sliderValue);
+  const chapterBlock = ctx.chapter
+    ? `\n=== ACTIVE ACT/CHAPTER ===\n${formatChapterContext(ctx.chapter)}`
+    : "";
+  const sliderGuidance = soulCheckSliderGuidance(ctx.sliderValue);
 
   if (mode === "soul-check") {
-    return `You are a brutally honest, analytical Literary Editor — not a cheerleader.
-Your job is to find emotionally flat, robotic, clichéd, or distant prose in the author's manuscript and name it precisely.
+    return `You are a brutally honest, analytical Literary Editor.
 
 ${bibleBlock}
+${chapterBlock}
 
 ${sliderGuidance}
 
-STORY BIBLE ENFORCEMENT (The "Kamala" test):
-- Cross-reference every named character in the manuscript against their CHARACTER PROFILES above.
-- If a character's actions, voice, choices, or emotional beats contradict their defined role, flaw, motivation, or appearance — flag it as a targetText entry.
-- Example: if Kamala is defined as cautious but acts recklessly without narrative justification, cite the exact line and explain the contradiction.
+STORY BIBLE ENFORCEMENT:
+- Cross-reference every named character against CHARACTER PROFILES.
+- Flag lines where characters contradict their flaw, motivation, role, or appearance.
 
-CRITICAL OUTPUT RULES — VIOLATION BREAKS THE FRONTEND:
-1. Return ONLY a raw JSON array. No markdown fences. No preamble. No postscript. No conversational pleasantries.
-2. Each object MUST use this exact schema:
+CRITICAL OUTPUT — raw JSON array ONLY:
 [
   {
-    "targetText": "The exact sentence or phrase copied VERBATIM and WORD-FOR-WORD from the user's manuscript.",
+    "targetText": "verbatim substring from manuscript",
     "severity": "cold" | "lukewarm",
-    "critique": "Why this specific line sounds robotic, a cliché, lacks emotional resonance, or breaks character canon.",
-    "soulPrompt": "A deep psychological or sensory question that guides the author to rewrite it manually."
+    "critique": "detailed explanation",
+    "soulPrompt": "reflective question for manual writing",
+    "toneSuggestions": {
+      "visceral": "raw, sensory-heavy rewrite snippet replacing targetText",
+      "subtextual": "psychological tension rewrite snippet",
+      "dramatic": "high-stakes emotional rewrite snippet"
+    }
   }
 ]
-3. "targetText" MUST be a perfect substring of the manuscript you are analyzing. Copy it character-for-character including punctuation. If you cannot find an exact match, OMIT that entry entirely.
-4. Use severity "cold" for emotionally distant or clinical prose; "lukewarm" for clichés, telling-not-showing, or low-resonance beats.
-5. Return an empty array [] if the passage has no flat spots worth flagging.
-6. Provide 1–5 entries maximum. Skip generic summaries — every entry must anchor to a quoted line.
-7. Do NOT rewrite the prose. The soulPrompt must be a question only — the human author rewrites manually.`;
+Rules:
+- targetText MUST be exact manuscript substring or OMIT entry.
+- toneSuggestions snippets must be same length/order as targetText replacement candidates.
+- soulPrompt remains a question; toneSuggestions are optional fast-rewrite snippets.
+- 1–5 entries max. Empty array [] if voice is solid.`;
   }
 
-  return `You are a ghostwriting collaborator embedded in Soul Writer.
-Continue or expand the author's prose while honoring their established world.
+  const tier = ctx.ghostwriteTier ?? "ghostwriter";
+  const tierBlock = ghostwriteTierPrompt(tier, ctx.sliderValue);
+
+  if (tier === "assist") {
+    return `You are a structural writing coach in Soul Writer.
 
 ${bibleBlock}
+${chapterBlock}
 
-${sliderGuidance}
+${tierBlock}
 
-Honor every character profile, plot beat, and lore note from the Story Bible.
-
-You MUST respond with valid JSON only — no markdown fences, no preamble. Use this exact shape:
+Return JSON only:
 {
-  "prose": "the continuation or expansion text",
-  "rationale": "brief note on creative choices (1-2 sentences)"
+  "structuralAdvice": "2-4 sentences of craft guidance for this chapter",
+  "outlineIdeas": "bullet-style scene ideas the author can pursue manually",
+  "rationale": "why these suggestions fit the chapter objectives"
+}`;
+  }
+
+  if (tier === "copilot") {
+    return `You are a co-pilot sentence completer in Soul Writer.
+
+${bibleBlock}
+${chapterBlock}
+
+${tierBlock}
+
+Return JSON only:
+{
+  "prose": "short completion of the current sentence only",
+  "rationale": "brief note on the completion choice"
+}`;
+  }
+
+  return `You are a ghostwriting collaborator in Soul Writer.
+
+${bibleBlock}
+${chapterBlock}
+
+${tierBlock}
+
+Return JSON only:
+{
+  "prose": "200-300 words continuing the scene per chapter objectives",
+  "rationale": "brief creative note"
 }`;
 }
 
 export function buildUserPrompt(ctx: PromptContext, mode: AiMode): string {
+  const sliderLine = `Collaboration Slider: ${ctx.sliderValue}/100`;
+
   if (mode === "soul-check" && ctx.selectedText) {
     return `Story: "${ctx.storyTitle}"
-Collaboration Slider value for this request: ${ctx.sliderValue}/100
+${sliderLine}
 
-Manuscript passage to audit (copy targetText from this text ONLY):
+Passage to audit:
 ---
 ${ctx.selectedText}
----
-
-Return the JSON array of editorial flags.`;
+---`;
   }
 
   if (mode === "soul-check") {
     return `Story: "${ctx.storyTitle}"
-Collaboration Slider value for this request: ${ctx.sliderValue}/100
+${sliderLine}
 
-Manuscript excerpt to audit (copy targetText from this text ONLY):
+Chapter draft excerpt:
 ---
 ${ctx.draftContent.slice(-4000)}
----
+---`;
+  }
 
-Return the JSON array of editorial flags.`;
+  const tier = ctx.ghostwriteTier ?? "ghostwriter";
+
+  if (tier === "copilot" && ctx.cursorPrefix) {
+    return `Story: "${ctx.storyTitle}"
+${sliderLine}
+
+Complete this sentence in progress:
+---
+${ctx.cursorPrefix}
+---`;
   }
 
   return `Story: "${ctx.storyTitle}"
-Collaboration Slider value for this request: ${ctx.sliderValue}/100
+${sliderLine}
 
-Current draft (continue from here):
+Current chapter draft:
 ---
 ${ctx.draftContent.slice(-6000)}
----
-
-Write the next passage. Return JSON with "prose" and "rationale".`;
+---`;
 }

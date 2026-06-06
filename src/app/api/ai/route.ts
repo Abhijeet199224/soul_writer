@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchStoryBible } from "@/lib/ai/fetch-story-context";
 import { generateWithGemini } from "@/lib/gemini/generate";
 import { getCharactersUsedInText } from "@/lib/story-bible-context";
+import { getGhostwriteTier } from "@/lib/chapters";
 import type { AiMode } from "@/lib/gemini/prompts";
 
 interface AiRequestBody {
@@ -11,6 +12,8 @@ interface AiRequestBody {
   draft: string;
   sliderValue?: number;
   beat?: string;
+  chapterId?: string;
+  cursorPrefix?: string;
 }
 
 export async function POST(request: Request) {
@@ -30,12 +33,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { storyId, mode, draft, beat } = body;
+  const { storyId, mode, draft, beat, chapterId, cursorPrefix } = body;
   const sliderValue = Math.min(100, Math.max(0, body.sliderValue ?? 50));
+  const ghostwriteTier = getGhostwriteTier(sliderValue);
 
-  if (!storyId || !mode || typeof draft !== "string") {
+  if (!storyId || !mode) {
     return NextResponse.json(
-      { error: "storyId, mode, and draft are required" },
+      { error: "storyId and mode are required" },
       { status: 400 },
     );
   }
@@ -44,9 +48,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
   }
 
-  if (!draft.trim()) {
+  if (mode === "ghostwrite" && ghostwriteTier !== "assist" && !draft.trim()) {
     return NextResponse.json(
-      { error: "Draft text cannot be empty" },
+      { error: "Draft text cannot be empty for this slider tier" },
       { status: 400 },
     );
   }
@@ -62,7 +66,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Story not found" }, { status: 404 });
   }
 
-  const bible = await fetchStoryBible(supabase, storyId);
+  const bible = await fetchStoryBible(supabase, storyId, chapterId);
 
   if (!bible || bible.characters.length === 0) {
     return NextResponse.json(
@@ -83,8 +87,11 @@ export async function POST(request: Request) {
       {
         storyTitle: story.title,
         bible: bibleWithBeat,
+        chapter: bible.chapter,
         sliderValue,
+        ghostwriteTier: mode === "ghostwrite" ? ghostwriteTier : undefined,
         draftContent: draft,
+        cursorPrefix,
       },
       mode,
     );
@@ -95,6 +102,7 @@ export async function POST(request: Request) {
       result,
       mode,
       sliderValue,
+      ghostwriteTier,
       charactersUsed,
     });
   } catch (error) {

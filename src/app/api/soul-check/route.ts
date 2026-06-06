@@ -16,10 +16,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { storyId, selectedText, sliderValue = 50 } = body as {
+    const { storyId, selectedText, sliderValue = 50, chapterId } = body as {
       storyId?: string;
       selectedText?: string;
       sliderValue?: number;
+      chapterId?: string;
     };
 
     if (!storyId || !selectedText?.trim()) {
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Story not found" }, { status: 404 });
     }
 
-    const bible = await fetchStoryBible(supabase, storyId);
+    const bible = await fetchStoryBible(supabase, storyId, chapterId);
     if (!bible || bible.characters.length === 0) {
       return NextResponse.json(
         {
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
       {
         storyTitle: story.title,
         bible,
+        chapter: bible.chapter,
         sliderValue: clampedSlider,
         draftContent: manuscript,
         selectedText: manuscript,

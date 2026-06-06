@@ -1,12 +1,14 @@
-import type { Character } from "@/lib/types";
+import type { Character, StoryChapter } from "@/lib/types";
 import type { OutlineBeat } from "@/lib/story-notes";
 import { formatCharacterContext, getRelevantCharacters } from "@/lib/character-context";
+import { formatChapterContext } from "@/lib/chapters";
 
 export interface StoryBiblePayload {
   characters: Character[];
   outline: OutlineBeat[];
   settingNotes: string;
   sceneBeat?: string;
+  chapter?: StoryChapter | null;
 }
 
 export function parseOutlineJson(value: unknown): OutlineBeat[] {
@@ -34,10 +36,7 @@ export function indexCharactersByName(characters: Character[]) {
 
 export function formatOutlineContext(outline: OutlineBeat[]): string {
   if (!outline.length) return "No plot outline defined yet.";
-
-  return outline
-    .map((beat) => `[${beat.act}] ${beat.title}`)
-    .join("\n");
+  return outline.map((beat) => `[${beat.act}] ${beat.title}`).join("\n");
 }
 
 export function formatSettingNotesContext(settingNotes: string): string {
@@ -53,6 +52,9 @@ export function buildStoryBibleSystemBlock(
   const sceneLine = bible.sceneBeat?.trim()
     ? `Current scene beat: ${bible.sceneBeat.trim()}`
     : null;
+  const chapterLine = bible.chapter
+    ? formatChapterContext(bible.chapter)
+    : null;
 
   return [
     "=== CHARACTER PROFILES ===",
@@ -63,6 +65,7 @@ export function buildStoryBibleSystemBlock(
     "",
     "=== SETTING & LORE NOTES ===",
     formatSettingNotesContext(bible.settingNotes),
+    chapterLine ? `\n=== ACTIVE ACT/CHAPTER ===\n${chapterLine}` : null,
     sceneLine ? `\n=== ACTIVE SCENE ===\n${sceneLine}` : null,
   ]
     .filter(Boolean)
