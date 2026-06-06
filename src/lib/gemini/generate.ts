@@ -24,7 +24,7 @@ export async function generateWithGemini({
     throw new Error("GEMINI_API_KEY is not configured on the server.");
   }
 
-  const modelName = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+  const modelName = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
   const client = new GoogleGenerativeAI(apiKey);
   const model = client.getGenerativeModel({
     model: modelName,
