@@ -28,11 +28,16 @@ cp .env.example .env.local
 Edit `.env.local` with your Supabase keys (see step 1 below), then:
 
 ```bash
-npm run local:setup   # optional — verifies .env and database
-npm run dev
+npm run local:start
 ```
 
-Open **http://localhost:3001** in your browser.
+Open **http://127.0.0.1:3001** in your browser (use `127.0.0.1` if `localhost` refuses).
+
+**Localtunnel works but localhost doesn't?** The tunnel runs from the Cloud VM. On your Mac you must run `npm run local:start` in a **local Terminal** (not the Cloud Agent). Diagnose with:
+
+```bash
+npm run local:doctor
+```
 
 If port 3001 is stuck: `npm run dev:reset`
 
@@ -100,11 +105,15 @@ npm run auth:reset -- your@email.com yournewpassword
 ### 5. Enable Gemini (Ghostwriter + Soul Checker)
 
 1. Get an API key from [Google AI Studio](https://aistudio.google.com/apikey)
-2. Add to `.env.local`:
+2. Add to `.env.local` only (never commit real keys):
 
 ```bash
 GEMINI_API_KEY=your_key_here
 ```
+
+3. Restart the dev server after changing `.env.local`.
+
+**If you see "API key was reported as leaked":** Google revoked the key because it was exposed publicly. [Create a new key](https://aistudio.google.com/apikey), delete the old one, update `.env.local`, and restart.
 
 The `/api/ai` route fetches characters from your story in Supabase and injects them into every Gemini prompt — no manual copy-paste.
 
