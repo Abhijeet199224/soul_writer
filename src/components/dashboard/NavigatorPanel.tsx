@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
 import type { OutlineBeat, StoryNotes } from "@/lib/story-notes";
@@ -43,14 +44,14 @@ export function NavigatorPanel({
 
   if (collapsed) {
     return (
-      <aside className="flex w-12 shrink-0 flex-col items-center border-r border-stone-200 bg-white py-4">
+      <aside className="flex w-12 shrink-0 flex-col items-center border-r border-stone-200 bg-white py-4 transition-all duration-300 ease-in-out">
         <button
           type="button"
           onClick={onToggleCollapse}
-          title="Expand navigator"
-          className="rounded-lg p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900"
+          title="Expand Story Bible"
+          className="rounded-lg p-2 text-stone-500 transition hover:bg-stone-100 hover:text-stone-900"
         >
-          →
+          <PanelLeftOpen className="h-4 w-4" />
         </button>
       </aside>
     );
@@ -102,26 +103,27 @@ export function NavigatorPanel({
   }
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-r border-stone-200 bg-white xl:w-80">
+    <aside className="flex w-72 shrink-0 flex-col border-r border-stone-200 bg-white transition-all duration-300 ease-in-out xl:w-80">
       <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-700">
-          Navigator
+          Story Bible
         </p>
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="rounded-lg px-2 py-1 text-xs text-stone-500 hover:bg-stone-100"
+          title="Collapse Story Bible"
+          className="rounded-lg p-1.5 text-stone-500 transition hover:bg-stone-100 hover:text-stone-900"
         >
-          ←
+          <PanelLeftClose className="h-4 w-4" />
         </button>
       </div>
 
       <div className="flex border-b border-stone-100 px-2 py-2">
         {(
           [
-            ["outline", "Outline"],
+            ["outline", "Plot"],
             ["characters", "Characters"],
-            ["settings", "Settings"],
+            ["settings", "Lore"],
           ] as const
         ).map(([key, label]) => (
           <button

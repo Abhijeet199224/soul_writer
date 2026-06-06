@@ -28,6 +28,18 @@ export interface Character {
   updated_at: string;
 }
 
+export interface StoryWorkspace {
+  story_id: string;
+  draft_content: string;
+  outline_json: unknown;
+  setting_notes: string;
+  scene_beat: string;
+  slider_value: number;
+  updated_at: string;
+}
+
+export type SaveStatus = "idle" | "saving" | "saved" | "error" | "offline";
+
 export type CharacterInput = Pick<
   Character,
   | "name"

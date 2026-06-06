@@ -2,44 +2,89 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Character, Story } from "@/lib/types";
-import { useStoryNotes } from "@/hooks/useStoryNotes";
+import type { Character, Story, StoryWorkspace } from "@/lib/types";
+import type { OutlineBeat } from "@/lib/story-notes";
+import { parseOutlineJson } from "@/lib/story-bible-context";
+import { useDebouncedWorkspaceSave } from "@/hooks/useDebouncedWorkspaceSave";
 import { NavigatorPanel } from "./NavigatorPanel";
 import { WritingCanvas } from "./WritingCanvas";
-import { AiHubPanel, type AiResult } from "./AiHubPanel";
+import {
+  AiHubPanel,
+  type GhostwriteAiResult,
+  type SoulCheckAiResult,
+} from "./AiHubPanel";
+import type { GhostwriteResult, SoulCheckResult } from "@/lib/gemini/generate";
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-const starterDraft =
-  "Julian stood in the doorway, staring at the empty safe. Rain tapped the glass behind him. He should have called someone first, but that was never his way.";
+const defaultOutline: OutlineBeat[] = [
+  { id: "1", title: "Act 1: The Inciting Incident", act: "Act 1" },
+  { id: "2", title: "Act 2: The Midpoint Crisis", act: "Act 2" },
+  { id: "3", title: "Act 3: The Final Confrontation", act: "Act 3" },
+];
 
 interface StoryDashboardProps {
   story: Story;
   initialCharacters: Character[];
+  initialWorkspace: StoryWorkspace | null;
 }
 
 export function StoryDashboard({
   story,
   initialCharacters,
+  initialWorkspace,
 }: StoryDashboardProps) {
   const [characters, setCharacters] = useState(initialCharacters);
   const [navigatorCollapsed, setNavigatorCollapsed] = useState(false);
-  const [draft, setDraft] = useState(starterDraft);
-  const [sliderValue, setSliderValue] = useState(50);
-  const [beat, setBeat] = useState("");
+  const [aiHubCollapsed, setAiHubCollapsed] = useState(false);
+
+  const [draft, setDraft] = useState(initialWorkspace?.draft_content ?? "");
+  const [outline, setOutline] = useState<OutlineBeat[]>(
+    initialWorkspace?.outline_json
+      ? parseOutlineJson(initialWorkspace.outline_json)
+      : defaultOutline,
+  );
+  const [settingNotes, setSettingNotes] = useState(
+    initialWorkspace?.setting_notes ?? "",
+  );
+  const [sliderValue, setSliderValue] = useState(
+    initialWorkspace?.slider_value ?? 50,
+  );
+  const [beat, setBeat] = useState(initialWorkspace?.scene_beat ?? "");
+
   const [aiTab, setAiTab] = useState<"soul-check" | "ghostwrite">("soul-check");
   const [aiLoading, setAiLoading] = useState<"soul-check" | "ghostwrite" | null>(
     null,
   );
+  const [selectionLoading, setSelectionLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [soulCheckResult, setSoulCheckResult] = useState<AiResult | null>(null);
-  const [ghostwriteResult, setGhostwriteResult] = useState<AiResult | null>(null);
+  const [soulCheckResult, setSoulCheckResult] = useState<SoulCheckAiResult | null>(
+    null,
+  );
+  const [ghostwriteResult, setGhostwriteResult] =
+    useState<GhostwriteAiResult | null>(null);
   const [activeCharacter, setActiveCharacter] = useState<Character | null>(null);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
 
-  const { notes, updateOutline, updateSettingNotes } = useStoryNotes(story.id);
+  const workspaceSnapshot = useMemo(
+    () => ({
+      draftContent: draft,
+      outline,
+      settingNotes,
+      sceneBeat: beat,
+      sliderValue,
+    }),
+    [draft, outline, settingNotes, beat, sliderValue],
+  );
+
+  const { saveStatus } = useDebouncedWorkspaceSave({
+    storyId: story.id,
+    snapshot: workspaceSnapshot,
+  });
+
+  const focusMode = navigatorCollapsed && aiHubCollapsed;
 
   const linkedNames = useMemo(
     () =>
@@ -51,10 +96,47 @@ export function StoryDashboard({
     [characters, draft],
   );
 
+  async function runSelectionSoulCheck(selectedText: string) {
+    setSelectionLoading(true);
+    setAiError(null);
+    setAiTab("soul-check");
+    setAiHubCollapsed(false);
+
+    try {
+      const response = await fetch("/api/soul-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storyId: story.id,
+          selectedText,
+          sliderValue,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error ?? "Soul Check failed");
+      }
+
+      setSoulCheckResult({
+        kind: "soul-check",
+        data: data as SoulCheckResult,
+        charactersUsed: data.charactersUsed ?? [],
+        sliderValue: data.sliderValue ?? sliderValue,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : "Soul Check failed");
+    } finally {
+      setSelectionLoading(false);
+    }
+  }
+
   async function runAi(mode: "ghostwrite" | "soul-check") {
     setAiLoading(mode);
     setAiError(null);
     setAiTab(mode);
+    setAiHubCollapsed(false);
 
     try {
       const response = await fetch("/api/ai", {
@@ -74,22 +156,28 @@ export function StoryDashboard({
         throw new Error(data.error ?? "AI request failed");
       }
 
-      const result: AiResult = {
-        result: data.result,
-        charactersUsed: data.charactersUsed,
-        sliderValue: data.sliderValue,
-        timestamp: Date.now(),
-      };
-
       if (mode === "soul-check") {
-        setSoulCheckResult(result);
+        setSoulCheckResult({
+          kind: "soul-check",
+          data: data.result as SoulCheckResult,
+          charactersUsed: data.charactersUsed ?? [],
+          sliderValue: data.sliderValue ?? sliderValue,
+          timestamp: Date.now(),
+        });
       } else {
-        setGhostwriteResult(result);
-        if (sliderValue > 50) {
+        const ghostData = data.result as GhostwriteResult;
+        setGhostwriteResult({
+          kind: "ghostwrite",
+          data: ghostData,
+          charactersUsed: data.charactersUsed ?? [],
+          sliderValue: data.sliderValue ?? sliderValue,
+          timestamp: Date.now(),
+        });
+        if (sliderValue > 50 && ghostData.prose) {
           setDraft((current) =>
             current.trimEnd().endsWith("\n")
-              ? `${current}${data.result}`
-              : `${current}\n\n${data.result}`,
+              ? `${current}${ghostData.prose}`
+              : `${current}\n\n${ghostData.prose}`,
           );
         }
       }
@@ -106,7 +194,12 @@ export function StoryDashboard({
         <Link href="/dashboard" className="hover:text-stone-800">
           ← Stories
         </Link>
-        <span>Soul Writer · Unified Dashboard</span>
+        <span>
+          Soul Writer
+          {focusMode && (
+            <span className="ml-2 text-amber-700">· Focus mode</span>
+          )}
+        </span>
       </div>
 
       <div className="flex min-h-0 flex-1">
@@ -116,9 +209,9 @@ export function StoryDashboard({
           storyId={story.id}
           characters={characters}
           onCharactersChange={setCharacters}
-          notes={notes}
-          onOutlineChange={updateOutline}
-          onSettingNotesChange={updateSettingNotes}
+          notes={{ outline, settingNotes }}
+          onOutlineChange={setOutline}
+          onSettingNotesChange={setSettingNotes}
           onSelectBeat={setBeat}
         />
 
@@ -141,9 +234,15 @@ export function StoryDashboard({
             setActiveCharacter(null);
             setAnchorRect(null);
           }}
+          saveStatus={saveStatus}
+          focusMode={focusMode}
+          onSelectionSoulCheck={runSelectionSoulCheck}
+          selectionLoading={selectionLoading}
         />
 
         <AiHubPanel
+          collapsed={aiHubCollapsed}
+          onToggleCollapse={() => setAiHubCollapsed((value) => !value)}
           activeTab={aiTab}
           onTabChange={setAiTab}
           soulCheckResult={soulCheckResult}

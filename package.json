@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
+    "dev:reset": "node scripts/dev-server.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "db:apply": "node scripts/apply-schema.mjs",
+    "local:setup": "node --env-file=.env.local scripts/local-setup.mjs",
     "setup:check": "node --env-file=.env.local scripts/verify-setup.mjs",
     "auth:list": "node --env-file=.env.local scripts/fix-auth-user.mjs list",
     "auth:confirm-all": "node --env-file=.env.local scripts/fix-auth-user.mjs confirm-all",
@@ -17,6 +19,7 @@
     "@google/generative-ai": "^0.24.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.107.0",
+    "lucide-react": "^1.17.0",
     "next": "16.2.7",
     "react": "19.2.4",
     "react-dom": "19.2.4"

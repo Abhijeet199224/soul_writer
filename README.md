@@ -14,6 +14,32 @@ A wholesome writer app with **Context Interconnectivity** — character profiles
 - **Unified 3-panel dashboard** — Navigator (outline, characters, settings) · Writing Canvas · AI Hub
 - **Ghostwriter Slider** + **Soul Checker** — Gemini API routes pull character context from Supabase automatically
 
+## Run locally on your Mac (recommended)
+
+This is the original setup — the app runs on **your machine**, and `http://localhost:3001` works directly in your browser. No Cloud Agent, no port forwarding.
+
+```bash
+git clone https://github.com/Abhijeet199224/soul_writer.git
+cd soul_writer
+npm install
+cp .env.example .env.local
+```
+
+Edit `.env.local` with your Supabase keys (see step 1 below), then:
+
+```bash
+npm run local:setup   # optional — verifies .env and database
+npm run dev
+```
+
+Open **http://localhost:3001** in your browser.
+
+If port 3001 is stuck: `npm run dev:reset`
+
+In Cursor, use a **Local** agent (not Cloud) when developing on your Mac.
+
+---
+
 ## Quick start
 
 ### 1. Get your Supabase API keys
@@ -41,8 +67,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key_here
 **Option A — SQL Editor (easiest)**
 
 1. Open [SQL Editor](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/sql/new)
-2. Paste the contents of `supabase/migrations/20250606120000_initial_schema.sql`
-3. Run
+2. Run each migration file in order:
+   - `supabase/migrations/20250606120000_initial_schema.sql`
+   - `supabase/migrations/20250606200000_story_workspace.sql`
 
 **Option B — Script**
 
