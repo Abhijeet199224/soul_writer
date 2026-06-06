@@ -9,12 +9,14 @@ import { normalizeGeminiResult } from "./parse-response";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
 
+/** Curated text-generation models confirmed via Gemini API (June 2026). */
 const DEFAULT_FALLBACK_CHAIN = [
   "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-3.5-flash",
   "gemini-2.5-pro",
-  "gemini-1.5-pro",
+  "gemini-flash-latest",
+  "gemini-pro-latest",
 ] as const;
 
 export type SoulCheckSeverity = "cold" | "lukewarm";
@@ -53,14 +55,26 @@ function resolveModelChain(): string[] {
   return [primary, ...chain.filter((name) => name !== primary)];
 }
 
+function isModelUnavailableError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return (
+    /\b404\b/.test(message) &&
+    /no longer available|not found|is not supported|deprecated/i.test(message)
+  );
+}
+
 function isRetryableGeminiError(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err);
 
   if (
-    /\b(401|403|400|404)\b/.test(message) ||
+    /\b(401|403)\b/.test(message) ||
     /API key|leaked|not configured|permission denied/i.test(message)
   ) {
     return false;
+  }
+
+  if (isModelUnavailableError(err)) {
+    return true;
   }
 
   return (
@@ -123,7 +137,7 @@ export async function generateWithGemini(
 
       if (isRetryableGeminiError(err) && hasFallback) {
         console.warn(
-          `[Gemini] ${modelName} unavailable (${lastError.message}). Trying ${modelChain[index + 1]}…`,
+          `[Gemini] ${modelName} failed (${lastError.message}). Trying ${modelChain[index + 1]}…`,
         );
         continue;
       }
