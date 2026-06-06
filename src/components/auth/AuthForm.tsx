@@ -2,17 +2,21 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { getAuthCallbackUrl } from "@/lib/auth";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type Mode = "signin" | "signup";
 
 export function AuthForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackError = searchParams.get("error");
+
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(callbackError);
   const [message, setMessage] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent) {
@@ -22,11 +26,13 @@ export function AuthForm() {
     setMessage(null);
 
     const supabase = createClient();
+    const emailRedirectTo = getAuthCallbackUrl();
 
     if (mode === "signup") {
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: { emailRedirectTo },
       });
 
       if (signUpError) {
@@ -41,11 +47,7 @@ export function AuthForm() {
         return;
       }
 
-      setMessage(
-        "Account created. Check your email for a confirmation link, then sign in.",
-      );
-      setMode("signin");
-      setLoading(false);
+      router.push(`/auth/check-email?email=${encodeURIComponent(email)}`);
       return;
     }
 
@@ -55,11 +57,13 @@ export function AuthForm() {
     });
 
     if (signInError) {
-      const message = signInError.message.toLowerCase();
-      if (message.includes("invalid login credentials")) {
+      const normalized = signInError.message.toLowerCase();
+      if (normalized.includes("invalid login credentials")) {
         setError(
-          "Invalid email or password. If you just signed up, confirm your email first (check inbox and spam). Otherwise use Sign up to create an account.",
+          "Invalid email or password. If you just signed up, confirm your email first.",
         );
+      } else if (normalized.includes("email not confirmed")) {
+        setError("Please confirm your email before signing in.");
       } else {
         setError(signInError.message);
       }
@@ -69,6 +73,32 @@ export function AuthForm() {
 
     router.push("/dashboard");
     router.refresh();
+  }
+
+  async function handleResendFromSignIn() {
+    if (!email) {
+      setError("Enter your email above, then click resend.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    const supabase = createClient();
+    const { error: resendError } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: getAuthCallbackUrl() },
+    });
+
+    if (resendError) {
+      setError(resendError.message);
+    } else {
+      setMessage("Confirmation email sent. Check your inbox and spam.");
+    }
+
+    setLoading(false);
   }
 
   return (
@@ -82,11 +112,6 @@ export function AuthForm() {
         </h1>
         <p className="mt-2 text-sm text-stone-600">
           Build character bibles that feed your editor automatically.
-        </p>
-        <p className="mt-3 text-xs text-stone-500">
-          New here? Use Sign up first. If no confirmation email arrives, disable
-          &quot;Confirm email&quot; in Supabase or confirm your account via SQL
-          (see README).
         </p>
       </div>
 
@@ -167,6 +192,17 @@ export function AuthForm() {
               ? "Sign in"
               : "Create account"}
         </button>
+
+        {mode === "signin" && (
+          <button
+            type="button"
+            onClick={handleResendFromSignIn}
+            disabled={loading}
+            className="w-full text-sm text-amber-800 underline-offset-2 hover:underline disabled:opacity-60"
+          >
+            Resend confirmation email
+          </button>
+        )}
       </form>
     </div>
   );

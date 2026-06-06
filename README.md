@@ -49,23 +49,32 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key_here
 SUPABASE_DB_URL="postgresql://postgres.[ref]:[password]@..." npm run db:apply
 ```
 
-### 4. Enable email auth
+### 4. Enable email verification (required for sign-up emails)
 
-In [Authentication → Providers](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/providers), ensure **Email** is enabled.
+Supabase’s **built-in email only sends to org team addresses**. To keep email verification for all users, connect **Resend SMTP**:
 
-For local dev, disable email confirmation under [Authentication → Sign In / Providers → Email](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/providers) → turn off **Confirm email**. Otherwise you must click the link in your inbox before signing in.
+1. Create a free account at [resend.com](https://resend.com) and copy an API key
+2. Create a Supabase access token at [Account → Tokens](https://supabase.com/dashboard/account/tokens)
+3. Add to `.env.local`:
 
-### No confirmation email received?
+```bash
+NEXT_PUBLIC_SITE_URL=http://localhost:3001
+SUPABASE_ACCESS_TOKEN=your_supabase_access_token
+RESEND_API_KEY=re_your_resend_api_key
+SMTP_SENDER_EMAIL=onboarding@resend.dev
+```
 
-Supabase’s **built-in email only sends to addresses on your organization team**. Other addresses sign up successfully but never get mail.
+4. Run:
 
-**Quick fix (recommended for dev):**
+```bash
+npm run auth:configure
+```
 
-1. [Authentication → Providers → Email](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/providers)
-2. Turn **off** **Confirm email**
-3. Save
+This enables **Confirm email**, sets Resend SMTP, and registers `http://localhost:3001/auth/callback` as the redirect URL.
 
-**Or manually confirm your account in SQL Editor** — use `supabase/troubleshooting-auth.sql` (replace `YOUR_EMAIL@example.com` with your email, run steps 1–3).
+**Manual alternative:** [Authentication → Email → SMTP Settings](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/smtp) with host `smtp.resend.com`, port `465`, user `resend`, password = your Resend API key.
+
+For production, verify your own domain in Resend and set `SMTP_SENDER_EMAIL=noreply@yourdomain.com`.
 
 ### 5. Run the app
 
@@ -74,7 +83,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), sign up, create a story, add characters, then switch to the Smart Codex Editor tab.
+Open [http://localhost:3001](http://localhost:3001), sign up, confirm your email, create a story, add characters, then switch to the Smart Codex Editor tab.
 
 ## Architecture
 
@@ -97,3 +106,5 @@ Ghostwriter Slider + Soul Checker
 | `npm run dev` | Start dev server |
 | `npm run build` | Production build |
 | `npm run db:apply` | Apply schema via Postgres URI |
+| `npm run setup:check` | Verify Supabase connection + tables |
+| `npm run auth:configure` | Enable Resend SMTP + email verification |
