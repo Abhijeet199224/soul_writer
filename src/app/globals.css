@@ -22,3 +22,52 @@ body {
 .font-serif {
   font-family: var(--font-serif), Georgia, "Times New Roman", serif;
 }
+
+/* TipTap manuscript editor */
+.tiptap-manuscript p {
+  margin: 0.75em 0;
+}
+
+.tiptap-manuscript h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin: 1.25em 0 0.5em;
+  line-height: 1.3;
+}
+
+.tiptap-manuscript h2 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 1em 0 0.5em;
+  line-height: 1.35;
+}
+
+.tiptap-manuscript p.is-editor-empty:first-child::before {
+  color: #a8a29e;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap-manuscript mark {
+  border-radius: 0.2em;
+  padding: 0.1em 0.15em;
+  cursor: pointer;
+  transition: filter 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tiptap-manuscript mark[data-zone-type="cold"] {
+  background-color: rgb(99 102 241 / 0.2) !important;
+  color: rgb(49 46 129);
+}
+
+.tiptap-manuscript mark[data-zone-type="flat"] {
+  background-color: rgb(245 158 11 / 0.25) !important;
+  color: rgb(120 53 15);
+}
+
+.tiptap-manuscript mark:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 0 0 2px rgb(99 102 241 / 0.25);
+}

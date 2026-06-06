@@ -65,9 +65,24 @@ function asSoulCheckResult(parsed: Record<string, unknown>): SoulCheckResult {
     });
   }
 
+  const coldZones = Array.isArray(parsed.coldZones)
+    ? parsed.coldZones
+        .filter(
+          (item): item is Record<string, unknown> =>
+            typeof item === "object" && item !== null,
+        )
+        .map((item, index) => ({
+          excerpt: String(item.excerpt ?? "").trim(),
+          insightIndex: Number(item.insightIndex ?? index),
+          type: (item.type === "flat" ? "flat" : "cold") as "cold" | "flat",
+        }))
+        .filter((zone) => zone.excerpt.length > 0)
+    : [];
+
   return {
     insights,
     summary: String(parsed.summary ?? "Analysis complete."),
+    coldZones,
   };
 }
 
@@ -115,5 +130,6 @@ export function normalizeGeminiResult(
   return {
     insights: [{ title: "Soul Check", body: cleaned, tone: "encouraging" }],
     summary: "Parsed from unstructured response.",
+    coldZones: [],
   };
 }

@@ -14,6 +14,11 @@ import {
   type SoulCheckAiResult,
 } from "./AiHubPanel";
 import type { GhostwriteResult, SoulCheckResult } from "@/lib/gemini/generate";
+import {
+  appendHtmlParagraph,
+  htmlToPlainText,
+  normalizeDraftContent,
+} from "@/lib/draft-content";
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -40,7 +45,9 @@ export function StoryDashboard({
   const [navigatorCollapsed, setNavigatorCollapsed] = useState(false);
   const [aiHubCollapsed, setAiHubCollapsed] = useState(false);
 
-  const [draft, setDraft] = useState(initialWorkspace?.draft_content ?? "");
+  const [draft, setDraft] = useState(
+    normalizeDraftContent(initialWorkspace?.draft_content ?? ""),
+  );
   const [outline, setOutline] = useState<OutlineBeat[]>(
     initialWorkspace?.outline_json
       ? parseOutlineJson(initialWorkspace.outline_json)
@@ -67,6 +74,9 @@ export function StoryDashboard({
     useState<GhostwriteAiResult | null>(null);
   const [activeCharacter, setActiveCharacter] = useState<Character | null>(null);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  const [focusedInsightIndex, setFocusedInsightIndex] = useState<number | null>(
+    null,
+  );
 
   const workspaceSnapshot = useMemo(
     () => ({
@@ -82,7 +92,9 @@ export function StoryDashboard({
   const baselineKey = useMemo(
     () =>
       JSON.stringify({
-        draftContent: initialWorkspace?.draft_content ?? "",
+        draftContent: normalizeDraftContent(
+          initialWorkspace?.draft_content ?? "",
+        ),
         outline: initialWorkspace?.outline_json
           ? parseOutlineJson(initialWorkspace.outline_json)
           : defaultOutline,
@@ -101,21 +113,28 @@ export function StoryDashboard({
 
   const focusMode = navigatorCollapsed && aiHubCollapsed;
 
+  const plainDraft = useMemo(() => htmlToPlainText(draft), [draft]);
+
   const linkedNames = useMemo(
     () =>
       characters
         .filter((character) =>
-          new RegExp(`\\b${escapeRegex(character.name)}\\b`, "i").test(draft),
+          new RegExp(`\\b${escapeRegex(character.name)}\\b`, "i").test(
+            plainDraft,
+          ),
         )
         .map((character) => character.name),
-    [characters, draft],
+    [characters, plainDraft],
   );
+
+  const coldZones = soulCheckResult?.data.coldZones ?? [];
 
   async function runSelectionSoulCheck(selectedText: string) {
     setSelectionLoading(true);
     setAiError(null);
     setAiTab("soul-check");
     setAiHubCollapsed(false);
+    setFocusedInsightIndex(null);
 
     try {
       const response = await fetch("/api/soul-check", {
@@ -152,6 +171,7 @@ export function StoryDashboard({
     setAiError(null);
     setAiTab(mode);
     setAiHubCollapsed(false);
+    setFocusedInsightIndex(null);
 
     try {
       const response = await fetch("/api/ai", {
@@ -160,7 +180,7 @@ export function StoryDashboard({
         body: JSON.stringify({
           storyId: story.id,
           mode,
-          draft,
+          draft: plainDraft,
           sliderValue,
           beat: mode === "ghostwrite" ? beat : undefined,
         }),
@@ -189,11 +209,7 @@ export function StoryDashboard({
           timestamp: Date.now(),
         });
         if (sliderValue > 50 && ghostData.prose) {
-          setDraft((current) =>
-            current.trimEnd().endsWith("\n")
-              ? `${current}${ghostData.prose}`
-              : `${current}\n\n${ghostData.prose}`,
-          );
+          setDraft((current) => appendHtmlParagraph(current, ghostData.prose));
         }
       }
     } catch (error) {
@@ -253,6 +269,12 @@ export function StoryDashboard({
           focusMode={focusMode}
           onSelectionSoulCheck={runSelectionSoulCheck}
           selectionLoading={selectionLoading}
+          coldZones={coldZones}
+          onHighlightInsight={(index) => {
+            setFocusedInsightIndex(index);
+            setAiTab("soul-check");
+            setAiHubCollapsed(false);
+          }}
         />
 
         <AiHubPanel
@@ -267,6 +289,7 @@ export function StoryDashboard({
           selectionLoading={selectionLoading}
           error={aiError}
           charactersCount={characters.length}
+          focusedInsightIndex={focusedInsightIndex}
           onRunSoulCheck={() => runAi("soul-check")}
           onRunGhostwrite={() => runAi("ghostwrite")}
         />

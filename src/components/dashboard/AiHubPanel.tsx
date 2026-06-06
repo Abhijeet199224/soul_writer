@@ -37,6 +37,7 @@ interface AiHubPanelProps {
   linkedNames: string[];
   loading: AiHubTab | null;
   selectionLoading?: boolean;
+  focusedInsightIndex?: number | null;
   error: string | null;
   charactersCount: number;
   onRunSoulCheck: () => void;
@@ -78,6 +79,7 @@ export function AiHubPanel({
   linkedNames,
   loading,
   selectionLoading = false,
+  focusedInsightIndex = null,
   error,
   charactersCount,
   onRunSoulCheck,
@@ -213,7 +215,11 @@ export function AiHubPanel({
               {activeResult.data.insights.map((insight, index) => (
                 <article
                   key={`${insight.title}-${index}`}
-                  className={`rounded-xl border p-4 ${toneStyles[insight.tone]}`}
+                  className={`rounded-xl border p-4 transition-all duration-300 ${toneStyles[insight.tone]} ${
+                    focusedInsightIndex === index
+                      ? "ring-2 ring-indigo-400/70 ring-offset-2 shadow-md"
+                      : ""
+                  }`}
                 >
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-800">
                     {insight.title}

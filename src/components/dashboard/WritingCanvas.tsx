@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import type { Character, SaveStatus, Story } from "@/lib/types";
+import type { ColdZone } from "@/lib/gemini/generate";
+import { htmlToPlainText } from "@/lib/draft-content";
 import { splitTextByCharacters } from "@/lib/character-highlight";
 import { CharacterHoverCard } from "@/components/editor/CharacterHoverCard";
 import { SaveStatusIndicator } from "@/components/editor/SaveStatusIndicator";
-import { SelectionSoulCheckMenu } from "@/components/editor/SelectionSoulCheckMenu";
+import { TipTapEditor } from "@/components/editor/TipTapEditor";
 
 interface WritingCanvasProps {
   story: Story;
@@ -27,6 +29,8 @@ interface WritingCanvasProps {
   focusMode: boolean;
   onSelectionSoulCheck: (selectedText: string) => Promise<void>;
   selectionLoading: boolean;
+  coldZones?: ColdZone[];
+  onHighlightInsight?: (insightIndex: number) => void;
 }
 
 function sliderLabel(value: number) {
@@ -53,46 +57,15 @@ export function WritingCanvas({
   focusMode,
   onSelectionSoulCheck,
   selectionLoading,
+  coldZones = [],
+  onHighlightInsight,
 }: WritingCanvasProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [selectionMenu, setSelectionMenu] = useState<{
-    text: string;
-    top: number;
-    left: number;
-  } | null>(null);
+  const plainDraft = useMemo(() => htmlToPlainText(draft), [draft]);
 
   const segments = useMemo(
-    () => splitTextByCharacters(draft, characters),
-    [draft, characters],
+    () => splitTextByCharacters(plainDraft, characters),
+    [plainDraft, characters],
   );
-
-  const handleSelection = useCallback(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selected = draft.slice(start, end).trim();
-
-    if (!selected || selected.length < 3) {
-      setSelectionMenu(null);
-      return;
-    }
-
-    const rect = textarea.getBoundingClientRect();
-    const lineHeight = 28;
-    const linesBefore = draft.slice(0, start).split("\n").length - 1;
-    const top = rect.top + 80 + linesBefore * lineHeight;
-    const left = rect.left + rect.width / 2;
-
-    setSelectionMenu({ text: selected, top, left });
-  }, [draft]);
-
-  async function handleRunSelectionSoulCheck() {
-    if (!selectionMenu) return;
-    await onSelectionSoulCheck(selectionMenu.text);
-    setSelectionMenu(null);
-  }
 
   return (
     <section
@@ -142,23 +115,22 @@ export function WritingCanvas({
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col overflow-hidden p-5">
-        <textarea
-          ref={textareaRef}
-          value={draft}
-          onChange={(event) => {
-            onDraftChange(event.target.value);
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-5">
+        <TipTapEditor
+          content={draft}
+          onUpdate={(html) => {
+            onDraftChange(html);
             onClearHover();
-            setSelectionMenu(null);
           }}
-          onMouseUp={handleSelection}
-          onKeyUp={handleSelection}
-          className="min-h-[240px] flex-1 resize-none rounded-xl border border-stone-200 bg-white px-5 py-4 font-serif text-lg leading-relaxed text-stone-800 shadow-sm outline-none focus:border-amber-400"
-          placeholder="Write your scene. Highlight a passage to run Soul Check…"
+          coldZones={coldZones}
+          onHighlightInsight={onHighlightInsight}
+          onSelectionSoulCheck={(text) => void onSelectionSoulCheck(text)}
+          selectionLoading={selectionLoading}
+          placeholder="Write your scene. Select text for formatting or Soul Check…"
         />
 
         {!focusMode && (
-          <div className="mt-4 max-h-48 overflow-y-auto rounded-xl border border-dashed border-amber-200 bg-amber-50/50 px-4 py-3 font-serif text-base leading-relaxed text-stone-800">
+          <div className="max-h-40 shrink-0 overflow-y-auto rounded-xl border border-dashed border-amber-200 bg-amber-50/50 px-4 py-3 font-serif text-base leading-relaxed text-stone-800">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
               Smart Codex preview
             </p>
@@ -179,16 +151,6 @@ export function WritingCanvas({
           </div>
         )}
       </div>
-
-      {selectionMenu && (
-        <SelectionSoulCheckMenu
-          top={selectionMenu.top}
-          left={selectionMenu.left}
-          loading={selectionLoading}
-          onRunSoulCheck={() => void handleRunSelectionSoulCheck()}
-          onDismiss={() => setSelectionMenu(null)}
-        />
-      )}
 
       {activeCharacter && anchorRect && (
         <CharacterHoverCard character={activeCharacter} anchorRect={anchorRect} />

@@ -42,10 +42,17 @@ You MUST respond with valid JSON only — no markdown fences, no preamble. Use t
       "tone": "encouraging" | "cautionary" | "celebratory"
     }
   ],
-  "summary": "one sentence overall read"
+  "summary": "one sentence overall read",
+  "coldZones": [
+    {
+      "excerpt": "exact sentence or phrase copied from the passage",
+      "insightIndex": 0,
+      "type": "cold" | "flat"
+    }
+  ]
 }
 
-Provide 2-4 insights. Reference character names and lore from the Story Bible when relevant.`;
+Provide 2-4 insights. Include 1-3 coldZones for emotionally flat or cold passages (use type "cold" for distant prose, "flat" for low-energy beats). Each excerpt MUST be an exact substring from the analyzed text. Reference character names and lore from the Story Bible when relevant.`;
   }
 
   return `You are a ghostwriting collaborator embedded in Soul Writer.
