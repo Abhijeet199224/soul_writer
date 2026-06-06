@@ -11,6 +11,8 @@ A wholesome writer app with **Context Interconnectivity** — character profiles
 - Dashboard to create and open stories
 - Character Bible with structured profiles (name, role, age, appearance, flaw, motivation)
 - Smart Codex Editor — character names underline and open a hover card from the bible
+- **Unified 3-panel dashboard** — Navigator (outline, characters, settings) · Writing Canvas · AI Hub
+- **Ghostwriter Slider** + **Soul Checker** — Gemini API routes pull character context from Supabase automatically
 
 ## Quick start
 
@@ -49,20 +51,44 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key_here
 SUPABASE_DB_URL="postgresql://postgres.[ref]:[password]@..." npm run db:apply
 ```
 
-### 4. Enable email auth
+### 4. Disable email confirmation (simple login)
 
-In [Authentication → Providers](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/providers), ensure **Email** is enabled.
+For instant sign-up and sign-in without verification emails:
 
-For local dev, you may want to disable email confirmation under Authentication → Settings.
+1. Open [Authentication → Sign In / Providers → Email](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/providers)
+2. Turn **off** **Confirm email**
+3. Save
 
-### 5. Run the app
+If you get **Invalid email or password** after an earlier signup:
+
+1. **Easiest:** Delete your user in [Authentication → Users](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/users), then **Sign up** again in the app.
+2. **Or terminal fix** (add `SUPABASE_SERVICE_ROLE_KEY` from [API settings](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/settings/api) to `.env.local`):
+
+```bash
+npm run auth:reset -- your@email.com yournewpassword
+```
+
+3. **Or SQL:** Run the delete block in `supabase/fix-unconfirmed-users.sql` (replace with your email).
+
+### 5. Enable Gemini (Ghostwriter + Soul Checker)
+
+1. Get an API key from [Google AI Studio](https://aistudio.google.com/apikey)
+2. Add to `.env.local`:
+
+```bash
+GEMINI_API_KEY=your_key_here
+```
+
+The `/api/ai` route fetches characters from your story in Supabase and injects them into every Gemini prompt — no manual copy-paste.
+
+### 6. Run the app
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), sign up, create a story, add characters, then switch to the Smart Codex Editor tab.
+Open [http://localhost:3001](http://localhost:3001), sign up, create a story, then use the unified dashboard: Navigator on the left, Writing Canvas in the center, AI Hub on the right.
 
 ## Architecture
 
@@ -73,9 +99,9 @@ Story Bible (characters table)
         ▼
 Smart Codex Editor (name detection + hover cards)
         │
-        │ Step 2 & 3 (planned)
+        │ Step 2 & 3
         ▼
-Ghostwriter Slider + Soul Checker
+Ghostwriter Slider + Soul Checker (Gemini + /api/ai)
 ```
 
 ## Scripts
@@ -85,3 +111,4 @@ Ghostwriter Slider + Soul Checker
 | `npm run dev` | Start dev server |
 | `npm run build` | Production build |
 | `npm run db:apply` | Apply schema via Postgres URI |
+| `npm run setup:check` | Verify Supabase connection + tables |
