@@ -13,7 +13,7 @@ import {
   type GhostwriteAiResult,
   type SoulCheckAiResult,
 } from "./AiHubPanel";
-import type { GhostwriteResult, SoulCheckResult } from "@/lib/gemini/generate";
+import type { GhostwriteResult } from "@/lib/gemini/generate";
 import {
   appendHtmlParagraph,
   htmlToPlainText,
@@ -74,7 +74,7 @@ export function StoryDashboard({
     useState<GhostwriteAiResult | null>(null);
   const [activeCharacter, setActiveCharacter] = useState<Character | null>(null);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
-  const [focusedInsightIndex, setFocusedInsightIndex] = useState<number | null>(
+  const [activeInsightIndex, setActiveInsightIndex] = useState<number | null>(
     null,
   );
 
@@ -127,14 +127,14 @@ export function StoryDashboard({
     [characters, plainDraft],
   );
 
-  const coldZones = soulCheckResult?.data.coldZones ?? [];
+  const soulCheckInsights = soulCheckResult?.data.insights ?? [];
 
   async function runSelectionSoulCheck(selectedText: string) {
     setSelectionLoading(true);
     setAiError(null);
     setAiTab("soul-check");
     setAiHubCollapsed(false);
-    setFocusedInsightIndex(null);
+    setActiveInsightIndex(null);
 
     try {
       const response = await fetch("/api/soul-check", {
@@ -154,7 +154,7 @@ export function StoryDashboard({
 
       setSoulCheckResult({
         kind: "soul-check",
-        data: data as SoulCheckResult,
+        data: { insights: data.insights ?? [] },
         charactersUsed: data.charactersUsed ?? [],
         sliderValue: data.sliderValue ?? sliderValue,
         timestamp: Date.now(),
@@ -171,7 +171,7 @@ export function StoryDashboard({
     setAiError(null);
     setAiTab(mode);
     setAiHubCollapsed(false);
-    setFocusedInsightIndex(null);
+    setActiveInsightIndex(null);
 
     try {
       const response = await fetch("/api/ai", {
@@ -194,7 +194,10 @@ export function StoryDashboard({
       if (mode === "soul-check") {
         setSoulCheckResult({
           kind: "soul-check",
-          data: data.result as SoulCheckResult,
+          data: {
+            insights: (data.result as { insights?: SoulCheckAiResult["data"]["insights"] })
+              ?.insights ?? [],
+          },
           charactersUsed: data.charactersUsed ?? [],
           sliderValue: data.sliderValue ?? sliderValue,
           timestamp: Date.now(),
@@ -269,9 +272,9 @@ export function StoryDashboard({
           focusMode={focusMode}
           onSelectionSoulCheck={runSelectionSoulCheck}
           selectionLoading={selectionLoading}
-          coldZones={coldZones}
+          soulCheckInsights={soulCheckInsights}
           onHighlightInsight={(index) => {
-            setFocusedInsightIndex(index);
+            setActiveInsightIndex(index);
             setAiTab("soul-check");
             setAiHubCollapsed(false);
           }}
@@ -289,7 +292,7 @@ export function StoryDashboard({
           selectionLoading={selectionLoading}
           error={aiError}
           charactersCount={characters.length}
-          focusedInsightIndex={focusedInsightIndex}
+          activeInsightIndex={activeInsightIndex}
           onRunSoulCheck={() => runAi("soul-check")}
           onRunGhostwrite={() => runAi("ghostwrite")}
         />

@@ -51,23 +51,26 @@ body {
 }
 
 .tiptap-manuscript mark {
-  border-radius: 0.2em;
-  padding: 0.1em 0.15em;
+  border-radius: 0.15em;
+  padding: 0.05em 0.1em;
   cursor: pointer;
-  transition: filter 0.2s ease, box-shadow 0.2s ease;
+  border-bottom: 1px dashed transparent;
+  transition: all 0.2s ease;
 }
 
-.tiptap-manuscript mark[data-zone-type="cold"] {
+.tiptap-manuscript mark[data-severity="cold"] {
   background-color: rgb(99 102 241 / 0.2) !important;
-  color: rgb(49 46 129);
+  color: rgb(30 27 75);
+  border-bottom-color: rgb(129 140 248 / 0.5);
 }
 
-.tiptap-manuscript mark[data-zone-type="flat"] {
-  background-color: rgb(245 158 11 / 0.25) !important;
-  color: rgb(120 53 15);
+.tiptap-manuscript mark[data-severity="lukewarm"] {
+  background-color: rgb(245 158 11 / 0.2) !important;
+  color: rgb(69 26 3);
+  border-bottom-color: rgb(251 191 36 / 0.5);
 }
 
 .tiptap-manuscript mark:hover {
-  filter: brightness(1.05);
-  box-shadow: 0 0 0 2px rgb(99 102 241 / 0.25);
+  filter: brightness(1.04);
+  box-shadow: 0 1px 0 0 rgb(0 0 0 / 0.06);
 }

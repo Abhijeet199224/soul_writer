@@ -9,22 +9,17 @@ import { normalizeGeminiResult } from "./parse-response";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
 
-export interface SoulCheckInsight {
-  title: string;
-  body: string;
-  tone: "encouraging" | "cautionary" | "celebratory";
-}
+export type SoulCheckSeverity = "cold" | "lukewarm";
 
-export interface ColdZone {
-  excerpt: string;
-  insightIndex: number;
-  type: "cold" | "flat";
+export interface SoulCheckInsight {
+  targetText: string;
+  severity: SoulCheckSeverity;
+  critique: string;
+  soulPrompt: string;
 }
 
 export interface SoulCheckResult {
   insights: SoulCheckInsight[];
-  summary: string;
-  coldZones: ColdZone[];
 }
 
 export interface GhostwriteResult {
@@ -42,7 +37,7 @@ function getClient(): GoogleGenerativeAI {
 
 export async function generateWithGemini(
   ctx: PromptContext,
-  mode: AiMode
+  mode: AiMode,
 ): Promise<SoulCheckResult | GhostwriteResult> {
   const genAI = getClient();
   const model = genAI.getGenerativeModel({
@@ -62,5 +57,6 @@ export async function generateWithGemini(
     throw new Error("Gemini returned an empty response");
   }
 
-  return normalizeGeminiResult(text, mode);
+  const sourceText = ctx.selectedText ?? ctx.draftContent;
+  return normalizeGeminiResult(text, mode, sourceText);
 }

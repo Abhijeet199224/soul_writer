@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { AppHeader } from "@/components/layout/AppHeader";
+import { StoryAuthGuard } from "@/components/auth/StoryAuthGuard";
 import { StoryDashboard } from "@/components/dashboard/StoryDashboard";
 import { createClient } from "@/lib/supabase/server";
 import type { Character, Story, StoryWorkspace } from "@/lib/types";
@@ -23,6 +24,7 @@ export default async function StoryPage({ params }: StoryPageProps) {
     .from("stories")
     .select("*")
     .eq("id", id)
+    .eq("user_id", user.id)
     .single();
 
   if (storyError || !story) {
@@ -46,11 +48,13 @@ export default async function StoryPage({ params }: StoryPageProps) {
   return (
     <div className="flex min-h-screen flex-col bg-stone-100">
       <AppHeader email={user.email} fullWidth />
-      <StoryDashboard
-        story={story as Story}
-        initialCharacters={(characters as Character[]) ?? []}
-        initialWorkspace={(workspace as StoryWorkspace | null) ?? null}
-      />
+      <StoryAuthGuard>
+        <StoryDashboard
+          story={story as Story}
+          initialCharacters={(characters as Character[]) ?? []}
+          initialWorkspace={(workspace as StoryWorkspace | null) ?? null}
+        />
+      </StoryAuthGuard>
     </div>
   );
 }

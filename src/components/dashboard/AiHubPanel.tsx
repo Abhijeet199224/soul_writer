@@ -1,15 +1,16 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import {
   PanelRightClose,
   PanelRightOpen,
   Sparkles,
 } from "lucide-react";
-import type { GhostwriteResult, SoulCheckResult } from "@/lib/gemini/generate";
+import type { GhostwriteResult, SoulCheckInsight } from "@/lib/gemini/generate";
 
 export interface SoulCheckAiResult {
   kind: "soul-check";
-  data: SoulCheckResult;
+  data: { insights: SoulCheckInsight[] };
   charactersUsed: string[];
   sliderValue: number;
   timestamp: number;
@@ -37,7 +38,7 @@ interface AiHubPanelProps {
   linkedNames: string[];
   loading: AiHubTab | null;
   selectionLoading?: boolean;
-  focusedInsightIndex?: number | null;
+  activeInsightIndex?: number | null;
   error: string | null;
   charactersCount: number;
   onRunSoulCheck: () => void;
@@ -63,11 +64,59 @@ function InsightSkeleton() {
   );
 }
 
-const toneStyles = {
-  encouraging: "border-emerald-200 bg-emerald-50/50",
-  cautionary: "border-amber-300 bg-amber-50/80",
-  celebratory: "border-violet-200 bg-violet-50/50",
+const severityBadge = {
+  cold: "bg-indigo-100 text-indigo-800",
+  lukewarm: "bg-amber-100 text-amber-900",
 } as const;
+
+function SoulCheckInsightCard({
+  insight,
+  index,
+  isActive,
+  cardRef,
+}: {
+  insight: SoulCheckInsight;
+  index: number;
+  isActive: boolean;
+  cardRef: (element: HTMLElement | null) => void;
+}) {
+  return (
+    <article
+      ref={cardRef}
+      className={`rounded-xl border border-stone-200 bg-white p-4 shadow-sm transition-all duration-300 ${
+        isActive
+          ? "border-amber-400/70 ring-2 ring-amber-400/50 ring-offset-2 shadow-md"
+          : "hover:border-stone-300"
+      }`}
+    >
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${severityBadge[insight.severity]}`}
+        >
+          {insight.severity}
+        </span>
+        <span className="text-[10px] text-stone-400">#{index + 1}</span>
+      </div>
+
+      <blockquote className="border-l-2 border-amber-400/60 bg-amber-50/40 px-3 py-2 font-serif text-sm italic leading-relaxed text-stone-700">
+        &ldquo;{insight.targetText}&rdquo;
+      </blockquote>
+
+      <p className="mt-3 text-sm leading-relaxed text-stone-700">
+        {insight.critique}
+      </p>
+
+      <div className="mt-4 rounded-xl border border-stone-700/60 bg-stone-900 px-4 py-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-300">
+          Soul Revision Prompt
+        </p>
+        <p className="mt-2 font-serif text-sm leading-relaxed text-stone-200">
+          {insight.soulPrompt}
+        </p>
+      </div>
+    </article>
+  );
+}
 
 export function AiHubPanel({
   collapsed,
@@ -79,18 +128,26 @@ export function AiHubPanel({
   linkedNames,
   loading,
   selectionLoading = false,
-  focusedInsightIndex = null,
+  activeInsightIndex = null,
   error,
   charactersCount,
   onRunSoulCheck,
   onRunGhostwrite,
 }: AiHubPanelProps) {
+  const cardRefs = useRef<(HTMLElement | null)[]>([]);
+
   const activeResult =
     activeTab === "soul-check" ? soulCheckResult : ghostwriteResult;
   const isLoading =
     loading === activeTab ||
     (activeTab === "soul-check" && selectionLoading);
   const isBusy = loading !== null || selectionLoading;
+
+  useEffect(() => {
+    if (activeInsightIndex == null) return;
+    const card = cardRefs.current[activeInsightIndex];
+    card?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [activeInsightIndex]);
 
   if (collapsed) {
     return (
@@ -202,44 +259,51 @@ export function AiHubPanel({
               <Sparkles className="h-3.5 w-3.5 animate-pulse" />
               <span>
                 {selectionLoading && activeTab === "soul-check"
-                  ? "Soul Checker is reading your selection…"
-                  : "Gemini is reading your prose…"}
+                  ? "Literary Editor is reading your selection…"
+                  : "Gemini is auditing your prose…"}
               </span>
             </div>
             <InsightSkeleton />
           </div>
         ) : activeResult ? (
           activeResult.kind === "soul-check" ? (
-            <div className="space-y-3">
-              <p className="text-xs text-stone-500">{activeResult.data.summary}</p>
-              {activeResult.data.insights.map((insight, index) => (
-                <article
-                  key={`${insight.title}-${index}`}
-                  className={`rounded-xl border p-4 transition-all duration-300 ${toneStyles[insight.tone]} ${
-                    focusedInsightIndex === index
-                      ? "ring-2 ring-indigo-400/70 ring-offset-2 shadow-md"
-                      : ""
-                  }`}
-                >
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-800">
-                    {insight.title}
-                  </p>
-                  <p className="mt-2 text-sm leading-relaxed text-stone-800">
-                    {insight.body}
-                  </p>
-                </article>
-              ))}
-              <p className="text-[10px] text-stone-400">
-                {activeResult.charactersUsed.join(", ")} · {activeResult.sliderValue}%
-              </p>
-            </div>
+            activeResult.data.insights.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/50 p-8 text-center">
+                <p className="font-serif text-base text-emerald-900">
+                  ✨ Voice is solid! No flat spots detected.
+                </p>
+                <p className="mt-2 text-xs text-emerald-700/80">
+                  {activeResult.charactersUsed.join(", ")} ·{" "}
+                  {activeResult.sliderValue}%
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {activeResult.data.insights.map((insight, index) => (
+                  <SoulCheckInsightCard
+                    key={`${insight.targetText}-${index}`}
+                    insight={insight}
+                    index={index}
+                    isActive={activeInsightIndex === index}
+                    cardRef={(element) => {
+                      cardRefs.current[index] = element;
+                    }}
+                  />
+                ))}
+                <p className="text-[10px] text-stone-400">
+                  {activeResult.charactersUsed.join(", ")} ·{" "}
+                  {activeResult.sliderValue}%
+                </p>
+              </div>
+            )
           ) : (
             <div className="rounded-xl border border-stone-200 bg-stone-900 p-4 text-stone-100">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-300">
                 Ghostwriter output
               </p>
               <p className="mt-1 text-[10px] text-stone-400">
-                {activeResult.charactersUsed.join(", ")} · {activeResult.sliderValue}%
+                {activeResult.charactersUsed.join(", ")} ·{" "}
+                {activeResult.sliderValue}%
               </p>
               <div className="mt-3 whitespace-pre-wrap font-serif text-sm leading-relaxed text-stone-200">
                 {activeResult.data.prose}

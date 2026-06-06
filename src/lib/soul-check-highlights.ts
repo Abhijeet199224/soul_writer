@@ -1,6 +1,5 @@
 import type { Editor } from "@tiptap/react";
-import type { ColdZone } from "@/lib/gemini/generate";
-import { ZONE_COLORS } from "@/lib/tiptap/soul-highlight";
+import type { SoulCheckInsight } from "@/lib/gemini/generate";
 
 export function findTextRangesInDoc(
   doc: Editor["state"]["doc"],
@@ -25,38 +24,56 @@ export function findTextRangesInDoc(
   return ranges;
 }
 
-export function applySoulCheckHighlights(
-  editor: Editor,
-  zones: ColdZone[],
-): void {
-  if (!zones.length) return;
-
+export function clearSoulCheckHighlights(editor: Editor): void {
   const highlightMark = editor.schema.marks.highlight;
   if (!highlightMark) return;
 
   let { tr } = editor.state;
+
+  editor.state.doc.descendants((node, pos) => {
+    if (!node.isText || !node.text) return;
+    for (const mark of node.marks) {
+      if (mark.type.name === "highlight" && mark.attrs.insightIndex != null) {
+        tr = tr.removeMark(pos, pos + node.text.length, highlightMark);
+      }
+    }
+  });
+
+  editor.view.dispatch(tr);
+}
+
+export function applySoulCheckHighlights(
+  editor: Editor,
+  insights: SoulCheckInsight[],
+): void {
+  if (!insights.length) return;
+
+  const highlightMark = editor.schema.marks.highlight;
+  if (!highlightMark) return;
+
+  clearSoulCheckHighlights(editor);
+
+  let { tr } = editor.state;
   const used = new Set<string>();
 
-  for (const zone of zones) {
-    const excerpt = zone.excerpt?.trim();
-    if (!excerpt || used.has(excerpt)) continue;
-    used.add(excerpt);
+  insights.forEach((insight, insightIndex) => {
+    const targetText = insight.targetText?.trim();
+    if (!targetText || used.has(targetText)) return;
+    used.add(targetText);
 
-    const color = ZONE_COLORS[zone.type] ?? ZONE_COLORS.cold;
-    const ranges = findTextRangesInDoc(editor.state.doc, excerpt);
+    const ranges = findTextRangesInDoc(editor.state.doc, targetText);
 
     for (const { from, to } of ranges) {
       tr = tr.addMark(
         from,
         to,
         highlightMark.create({
-          color,
-          insightIndex: String(zone.insightIndex),
-          zoneType: zone.type,
+          insightIndex: String(insightIndex),
+          severity: insight.severity,
         }),
       );
     }
-  }
+  });
 
   editor.view.dispatch(tr);
 }
