@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useMemo } from "react";
 import type { Character, SaveStatus, Story } from "@/lib/types";
 import type { ColdZone } from "@/lib/gemini/generate";
@@ -7,7 +8,13 @@ import { htmlToPlainText } from "@/lib/draft-content";
 import { splitTextByCharacters } from "@/lib/character-highlight";
 import { CharacterHoverCard } from "@/components/editor/CharacterHoverCard";
 import { SaveStatusIndicator } from "@/components/editor/SaveStatusIndicator";
-import { TipTapEditor } from "@/components/editor/TipTapEditor";
+import { EditorSkeleton } from "@/components/editor/EditorSkeleton";
+
+const TipTapEditor = dynamic(
+  () =>
+    import("@/components/editor/TipTapEditor").then((mod) => mod.TipTapEditor),
+  { ssr: false, loading: () => <EditorSkeleton /> },
+);
 
 interface WritingCanvasProps {
   story: Story;

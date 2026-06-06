@@ -1,13 +1,22 @@
 /** Helpers for TipTap HTML draft storage vs plain-text AI/character APIs */
 
+/** SSR-safe: identical output on server and client (no DOMParser). */
 export function htmlToPlainText(content: string): string {
   if (!content?.trim()) return "";
   if (!isHtmlContent(content)) return content;
-  if (typeof document === "undefined") {
-    return content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  }
-  const doc = new DOMParser().parseFromString(content, "text/html");
-  return (doc.body.textContent ?? "").replace(/\s+/g, " ").trim();
+  return content
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/h[1-6]>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]+/g, " ")
+    .trim();
 }
 
 export function isHtmlContent(content: string): boolean {
