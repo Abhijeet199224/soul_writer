@@ -55,6 +55,18 @@ In [Authentication → Providers](https://supabase.com/dashboard/project/wqdbvjx
 
 For local dev, disable email confirmation under [Authentication → Sign In / Providers → Email](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/providers) → turn off **Confirm email**. Otherwise you must click the link in your inbox before signing in.
 
+### No confirmation email received?
+
+Supabase’s **built-in email only sends to addresses on your organization team**. Other addresses sign up successfully but never get mail.
+
+**Quick fix (recommended for dev):**
+
+1. [Authentication → Providers → Email](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/providers)
+2. Turn **off** **Confirm email**
+3. Save
+
+**Or manually confirm your account in SQL Editor** — use `supabase/troubleshooting-auth.sql` (replace `YOUR_EMAIL@example.com` with your email, run steps 1–3).
+
 ### 5. Run the app
 
 ```bash

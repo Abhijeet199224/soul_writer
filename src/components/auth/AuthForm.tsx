@@ -84,8 +84,9 @@ export function AuthForm() {
           Build character bibles that feed your editor automatically.
         </p>
         <p className="mt-3 text-xs text-stone-500">
-          New here? Use Sign up first. You may need to confirm your email before
-          signing in.
+          New here? Use Sign up first. If no confirmation email arrives, disable
+          &quot;Confirm email&quot; in Supabase or confirm your account via SQL
+          (see README).
         </p>
       </div>
 
