@@ -6,6 +6,7 @@ import type { Character, Story, StoryWorkspace } from "@/lib/types";
 import type { OutlineBeat } from "@/lib/story-notes";
 import { parseOutlineJson } from "@/lib/story-bible-context";
 import { useDebouncedWorkspaceSave } from "@/hooks/useDebouncedWorkspaceSave";
+import { useStoryBibleIndex } from "@/hooks/useStoryBibleIndex";
 import { NavigatorPanel } from "./NavigatorPanel";
 import { WritingCanvas } from "./WritingCanvas";
 import {
@@ -19,10 +20,6 @@ import {
   htmlToPlainText,
   normalizeDraftContent,
 } from "@/lib/draft-content";
-
-function escapeRegex(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 const defaultOutline: OutlineBeat[] = [
   { id: "1", title: "Act 1: The Inciting Incident", act: "Act 1" },
@@ -78,6 +75,8 @@ export function StoryDashboard({
     null,
   );
 
+  const storyBible = useStoryBibleIndex(characters, outline, settingNotes);
+
   const workspaceSnapshot = useMemo(
     () => ({
       draftContent: draft,
@@ -114,17 +113,9 @@ export function StoryDashboard({
   const focusMode = navigatorCollapsed && aiHubCollapsed;
 
   const plainDraft = useMemo(() => htmlToPlainText(draft), [draft]);
-
   const linkedNames = useMemo(
-    () =>
-      characters
-        .filter((character) =>
-          new RegExp(`\\b${escapeRegex(character.name)}\\b`, "i").test(
-            plainDraft,
-          ),
-        )
-        .map((character) => character.name),
-    [characters, plainDraft],
+    () => storyBible.getCharacterNamesInText(plainDraft),
+    [storyBible, plainDraft],
   );
 
   const soulCheckInsights = soulCheckResult?.data.insights ?? [];
@@ -273,6 +264,7 @@ export function StoryDashboard({
           onSelectionSoulCheck={runSelectionSoulCheck}
           selectionLoading={selectionLoading}
           soulCheckInsights={soulCheckInsights}
+          activeInsightIndex={activeInsightIndex}
           onHighlightInsight={(index) => {
             setActiveInsightIndex(index);
             setAiTab("soul-check");

@@ -19,12 +19,14 @@ import {
   applySoulCheckHighlights,
   clearSoulCheckHighlights,
   getInsightIndexAtPos,
+  syncActiveInsightHighlight,
 } from "@/lib/soul-check-highlights";
 
 interface TipTapEditorProps {
   content: string;
   onUpdate: (html: string) => void;
   soulCheckInsights?: SoulCheckInsight[];
+  activeInsightIndex?: number | null;
   onHighlightInsight?: (insightIndex: number) => void;
   onSelectionSoulCheck?: (selectedText: string) => void;
   selectionLoading?: boolean;
@@ -62,11 +64,19 @@ export function TipTapEditor({
   content,
   onUpdate,
   soulCheckInsights = [],
+  activeInsightIndex = null,
   onHighlightInsight,
   onSelectionSoulCheck,
   selectionLoading = false,
   placeholder = "Write your scene…",
 }: TipTapEditorProps) {
+  const highlightHandlerRef = useRef(onHighlightInsight);
+  const lastSelectionInsightRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    highlightHandlerRef.current = onHighlightInsight;
+  }, [onHighlightInsight]);
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -79,6 +89,16 @@ export function TipTapEditor({
     onUpdate: ({ editor: ed }) => {
       onUpdate(ed.getHTML());
     },
+    onSelectionUpdate: ({ editor: ed }) => {
+      const { from, to } = ed.state.selection;
+      if (from !== to) return;
+
+      const index = getInsightIndexAtPos(ed, from);
+      if (index == null || index === lastSelectionInsightRef.current) return;
+
+      lastSelectionInsightRef.current = index;
+      highlightHandlerRef.current?.(index);
+    },
     editorProps: {
       attributes: {
         class:
@@ -88,12 +108,6 @@ export function TipTapEditor({
     },
   });
 
-  const highlightHandlerRef = useRef(onHighlightInsight);
-
-  useEffect(() => {
-    highlightHandlerRef.current = onHighlightInsight;
-  }, [onHighlightInsight]);
-
   useEffect(() => {
     if (!editor) return;
     editor.setOptions({
@@ -102,6 +116,7 @@ export function TipTapEditor({
         handleClick: (_view, pos) => {
           const index = getInsightIndexAtPos(editor, pos);
           if (index != null) {
+            lastSelectionInsightRef.current = index;
             highlightHandlerRef.current?.(index);
             return true;
           }
@@ -133,7 +148,13 @@ export function TipTapEditor({
     }
 
     applySoulCheckHighlights(editor, soulCheckInsights);
-  }, [editor, soulCheckInsights]);
+    syncActiveInsightHighlight(editor, activeInsightIndex);
+  }, [editor, soulCheckInsights, activeInsightIndex]);
+
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    syncActiveInsightHighlight(editor, activeInsightIndex);
+  }, [editor, activeInsightIndex]);
 
   const runSoulCheckOnSelection = useCallback(() => {
     if (!editor || !onSelectionSoulCheck) return;

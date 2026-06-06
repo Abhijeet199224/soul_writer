@@ -69,6 +69,12 @@ const severityBadge = {
   lukewarm: "bg-amber-100 text-amber-900",
 } as const;
 
+const activeCardStyles = {
+  cold: "border-indigo-400/80 ring-2 ring-indigo-400/60 ring-offset-2 shadow-lg shadow-indigo-200/40 soul-card-active-cold",
+  lukewarm:
+    "border-amber-400/80 ring-2 ring-amber-400/60 ring-offset-2 shadow-lg shadow-amber-200/40 soul-card-active-lukewarm",
+} as const;
+
 function SoulCheckInsightCard({
   insight,
   index,
@@ -84,9 +90,7 @@ function SoulCheckInsightCard({
     <article
       ref={cardRef}
       className={`rounded-xl border border-stone-200 bg-white p-4 shadow-sm transition-all duration-300 ${
-        isActive
-          ? "border-amber-400/70 ring-2 ring-amber-400/50 ring-offset-2 shadow-md"
-          : "hover:border-stone-300"
+        isActive ? activeCardStyles[insight.severity] : "hover:border-stone-300"
       }`}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -102,7 +106,10 @@ function SoulCheckInsightCard({
         &ldquo;{insight.targetText}&rdquo;
       </blockquote>
 
-      <p className="mt-3 text-sm leading-relaxed text-stone-700">
+      <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
+        Editorial Critique
+      </p>
+      <p className="mt-1.5 text-sm leading-relaxed text-stone-700">
         {insight.critique}
       </p>
 

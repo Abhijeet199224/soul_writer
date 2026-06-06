@@ -74,3 +74,61 @@ body {
   filter: brightness(1.04);
   box-shadow: 0 1px 0 0 rgb(0 0 0 / 0.06);
 }
+
+.tiptap-manuscript mark.soul-highlight-active[data-severity="lukewarm"] {
+  animation: soul-pulse-amber 1.6s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgb(245 158 11 / 0.45);
+}
+
+.tiptap-manuscript mark.soul-highlight-active[data-severity="cold"] {
+  animation: soul-pulse-indigo 1.6s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgb(99 102 241 / 0.45);
+}
+
+@keyframes soul-pulse-amber {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgb(245 158 11 / 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgb(245 158 11 / 0.18);
+  }
+}
+
+@keyframes soul-pulse-indigo {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgb(99 102 241 / 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgb(99 102 241 / 0.18);
+  }
+}
+
+.soul-card-active-lukewarm {
+  animation: soul-card-glow-amber 1.6s ease-in-out infinite;
+}
+
+.soul-card-active-cold {
+  animation: soul-card-glow-indigo 1.6s ease-in-out infinite;
+}
+
+@keyframes soul-card-glow-amber {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgb(245 158 11 / 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgb(245 158 11 / 0.15);
+  }
+}
+
+@keyframes soul-card-glow-indigo {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgb(99 102 241 / 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgb(99 102 241 / 0.15);
+  }
+}

@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { OutlineBeat } from "@/lib/story-notes";
 import type { SaveStatus } from "@/lib/types";
 
-const DEBOUNCE_MS = 1500;
+const DRAFT_DEBOUNCE_MS = 1500;
+const META_DEBOUNCE_MS = 600;
 
 export interface WorkspaceSnapshot {
   draftContent: string;
@@ -34,6 +35,7 @@ export function useDebouncedWorkspaceSave({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string>(baselineKey ?? "");
   const snapshotRef = useRef(snapshot);
+  const lastDraftRef = useRef(snapshot.draftContent);
 
   useEffect(() => {
     snapshotRef.current = snapshot;
@@ -75,6 +77,7 @@ export function useDebouncedWorkspaceSave({
       }
 
       lastSavedRef.current = payloadKey;
+      lastDraftRef.current = current.draftContent;
       setSaveStatus("saved");
     } catch {
       setSaveStatus("error");
@@ -92,11 +95,14 @@ export function useDebouncedWorkspaceSave({
       return;
     }
 
-    setSaveStatus("idle");
+    const draftChanged = snapshot.draftContent !== lastDraftRef.current;
+    const delay = draftChanged ? DRAFT_DEBOUNCE_MS : META_DEBOUNCE_MS;
+
+    setSaveStatus((current) => (current === "saving" ? current : "idle"));
 
     timerRef.current = setTimeout(() => {
       void persist();
-    }, DEBOUNCE_MS);
+    }, delay);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
