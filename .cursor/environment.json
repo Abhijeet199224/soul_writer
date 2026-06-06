@@ -1,0 +1,8 @@
+{
+  "terminals": [
+    {
+      "name": "Soul Writer Dev",
+      "command": "npm run dev"
+    }
+  ]
+}
