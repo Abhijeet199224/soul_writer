@@ -28,11 +28,16 @@ cp .env.example .env.local
 Edit `.env.local` with your Supabase keys (see step 1 below), then:
 
 ```bash
-npm run local:setup   # optional — verifies .env and database
-npm run dev
+npm run local:start
 ```
 
-Open **http://localhost:3001** in your browser.
+Open **http://127.0.0.1:3001** in your browser (use `127.0.0.1` if `localhost` refuses).
+
+**Localtunnel works but localhost doesn't?** The tunnel runs from the Cloud VM. On your Mac you must run `npm run local:start` in a **local Terminal** (not the Cloud Agent). Diagnose with:
+
+```bash
+npm run local:doctor
+```
 
 If port 3001 is stuck: `npm run dev:reset`
 
