@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { fetchStoryBible } from "@/lib/ai/fetch-story-context";
 import { generateWithGemini } from "@/lib/gemini/generate";
-import { getRelevantCharacters } from "@/lib/character-context";
-import type { Character } from "@/lib/types";
+import { getCharactersUsedInText } from "@/lib/story-bible-context";
 import type { AiMode } from "@/lib/gemini/prompts";
 
 interface AiRequestBody {
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 
   const { data: story, error: storyError } = await supabase
     .from("stories")
-    .select("id")
+    .select("id, title")
     .eq("id", storyId)
     .eq("user_id", user.id)
     .single();
@@ -62,23 +62,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Story not found" }, { status: 404 });
   }
 
-  const { data: characters, error: charactersError } = await supabase
-    .from("characters")
-    .select("*")
-    .eq("story_id", storyId)
-    .order("name");
+  const bible = await fetchStoryBible(supabase, storyId);
 
-  if (charactersError) {
-    return NextResponse.json(
-      { error: charactersError.message },
-      { status: 500 },
-    );
-  }
-
-  const allCharacters = (characters as Character[]) ?? [];
-  const relevantCharacters = getRelevantCharacters(draft, allCharacters);
-
-  if (allCharacters.length === 0) {
+  if (!bible || bible.characters.length === 0) {
     return NextResponse.json(
       {
         error:
@@ -88,20 +74,28 @@ export async function POST(request: Request) {
     );
   }
 
+  const bibleWithBeat = beat?.trim()
+    ? { ...bible, sceneBeat: beat.trim() }
+    : bible;
+
   try {
-    const result = await generateWithGemini({
-      characters: relevantCharacters,
+    const result = await generateWithGemini(
+      {
+        storyTitle: story.title,
+        bible: bibleWithBeat,
+        sliderValue,
+        draftContent: draft,
+      },
       mode,
-      draft,
-      sliderValue,
-      beat,
-    });
+    );
+
+    const charactersUsed = getCharactersUsedInText(draft, bible.characters);
 
     return NextResponse.json({
       result,
       mode,
       sliderValue,
-      charactersUsed: relevantCharacters.map((character) => character.name),
+      charactersUsed,
     });
   } catch (error) {
     const message =

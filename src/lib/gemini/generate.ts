@@ -1,44 +1,59 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import type { Character } from "@/lib/types";
 import {
-  buildSystemInstruction,
+  buildSystemPrompt,
   buildUserPrompt,
   type AiMode,
-} from "@/lib/gemini/prompts";
+  type PromptContext,
+} from "./prompts";
+import { normalizeGeminiResult } from "./parse-response";
 
-export async function generateWithGemini({
-  characters,
-  mode,
-  draft,
-  sliderValue,
-  beat,
-}: {
-  characters: Character[];
-  mode: AiMode;
-  draft: string;
-  sliderValue: number;
-  beat?: string;
-}): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured on the server.");
+const DEFAULT_MODEL = "gemini-2.5-flash";
+
+export interface SoulCheckInsight {
+  title: string;
+  body: string;
+  tone: "encouraging" | "cautionary" | "celebratory";
+}
+
+export interface SoulCheckResult {
+  insights: SoulCheckInsight[];
+  summary: string;
+}
+
+export interface GhostwriteResult {
+  prose: string;
+  rationale: string;
+}
+
+function getClient(): GoogleGenerativeAI {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    throw new Error("GEMINI_API_KEY is not configured");
   }
+  return new GoogleGenerativeAI(key);
+}
 
-  const modelName = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
-  const client = new GoogleGenerativeAI(apiKey);
-  const model = client.getGenerativeModel({
-    model: modelName,
-    systemInstruction: buildSystemInstruction(characters, sliderValue, mode),
+export async function generateWithGemini(
+  ctx: PromptContext,
+  mode: AiMode
+): Promise<SoulCheckResult | GhostwriteResult> {
+  const genAI = getClient();
+  const model = genAI.getGenerativeModel({
+    model: process.env.GEMINI_MODEL ?? DEFAULT_MODEL,
+    systemInstruction: buildSystemPrompt(ctx, mode),
+    generationConfig: {
+      temperature: Math.min(0.3 + ctx.sliderValue / 200, 1),
+      maxOutputTokens: mode === "soul-check" ? 2048 : 4096,
+      responseMimeType: "application/json",
+    },
   });
 
-  const result = await model.generateContent(
-    buildUserPrompt(mode, draft, sliderValue, beat),
-  );
-
+  const result = await model.generateContent(buildUserPrompt(ctx, mode));
   const text = result.response.text();
+
   if (!text?.trim()) {
-    throw new Error("Gemini returned an empty response.");
+    throw new Error("Gemini returned an empty response");
   }
 
-  return text.trim();
+  return normalizeGeminiResult(text, mode);
 }

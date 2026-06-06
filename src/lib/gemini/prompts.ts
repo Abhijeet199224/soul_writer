@@ -1,84 +1,98 @@
-import type { Character } from "@/lib/types";
-import { formatCharacterContext } from "@/lib/character-context";
+import type { StoryBiblePayload } from "@/lib/story-bible-context";
+import { buildStoryBibleSystemBlock } from "@/lib/story-bible-context";
 
 export type AiMode = "ghostwrite" | "soul-check";
 
-function sliderGuidance(sliderValue: number): string {
-  if (sliderValue <= 25) {
-    return "Inspiration mode (0–25%): Offer 3 brief, distinct options the writer could use. Do not write full prose paragraphs.";
-  }
-  if (sliderValue <= 50) {
-    return "Brainstorm mode (26–50%): Suggest scene beats, lines, or reactions grounded in character flaws and motivations.";
-  }
-  if (sliderValue <= 75) {
-    return "Co-drafting mode (51–75%): Draft the next 150–250 words continuing the scene, matching the writer's voice.";
-  }
-  return "Ghostwriter mode (76–100%): Draft the next 250–350 words with strong momentum while honoring every character trait.";
+export interface PromptContext {
+  storyTitle: string;
+  bible: StoryBiblePayload;
+  sliderValue: number;
+  draftContent: string;
+  /** Soul Check: only the highlighted passage */
+  selectedText?: string;
 }
 
-export function buildSystemInstruction(
-  characters: Character[],
-  sliderValue: number,
-  mode: AiMode,
-): string {
-  const characterContext = formatCharacterContext(characters);
-
-  if (mode === "soul-check") {
-    return `You are the Soul Checker for a fiction writer. Your job is to audit prose against character bible profiles.
-
-CHARACTER BIBLE:
-${characterContext}
-
-RULES:
-- Flag dialogue or behavior that contradicts a character's flaw, motivation, age, or role.
-- Flag generic, voiceless, or interchangeable character writing.
-- Quote the problematic line or phrase when possible.
-- For each issue: name the character, explain the violation, and suggest a fix in their authentic voice.
-- If the prose is faithful to the bible, say so briefly.
-- Be direct and editorial, not flattering.`;
-  }
-
-  return `You are assisting a writer on Soul Writer. Here is the context of the characters in this story:
-
-${characterContext}
-
-Current Collaboration Slider: ${sliderValue}%.
-${sliderGuidance(sliderValue)}
-
-RULES:
-- Stay strictly inside these character traits.
-- Never invent character facts that contradict the bible.
-- Preserve the writer's tense and POV unless the draft is empty.
-- Output only the requested writing or suggestions — no preamble.`;
+function sliderLabel(value: number): string {
+  if (value <= 25) return "minimal AI influence — preserve the author's voice";
+  if (value <= 50) return "balanced collaboration";
+  if (value <= 75) return "strong AI guidance";
+  return "maximum AI creative direction";
 }
 
-export function buildUserPrompt(
-  mode: AiMode,
-  draft: string,
-  sliderValue: number,
-  beat?: string,
-): string {
+export function buildSystemPrompt(ctx: PromptContext, mode: AiMode): string {
+  const proseSample = ctx.selectedText ?? ctx.draftContent;
+  const bibleBlock = buildStoryBibleSystemBlock(ctx.bible, proseSample);
+  const slider = sliderLabel(ctx.sliderValue);
+
   if (mode === "soul-check") {
-    return `Run a Soul Check on this draft:
+    return `You are the Soul Checker — an empathetic editorial companion for fiction writers.
+Your role is to read a passage and return structured, emotionally intelligent feedback.
 
----
-${draft}
----
+${bibleBlock}
 
-List every character authenticity issue you find.`;
+AI Collaboration Slider: ${ctx.sliderValue}/100 (${slider}).
+At low values, be gentle and suggestive. At high values, be direct and specific.
+
+You MUST respond with valid JSON only — no markdown fences, no preamble. Use this exact shape:
+{
+  "insights": [
+    {
+      "title": "short headline",
+      "body": "2-4 sentences of feedback",
+      "tone": "encouraging" | "cautionary" | "celebratory"
+    }
+  ],
+  "summary": "one sentence overall read"
+}
+
+Provide 2-4 insights. Reference character names and lore from the Story Bible when relevant.`;
   }
 
-  const beatLine = beat?.trim()
-    ? `Scene beat to follow: ${beat.trim()}`
-    : "Continue naturally from the last line.";
+  return `You are a ghostwriting collaborator embedded in Soul Writer.
+Continue or expand the author's prose while honoring their established world.
 
-  return `Draft text so far:
+${bibleBlock}
 
+AI Collaboration Slider: ${ctx.sliderValue}/100 (${slider}).
+At low values, match the author's style closely with light suggestions.
+At high values, take bolder creative leaps while staying canon-consistent.
+
+You MUST respond with valid JSON only — no markdown fences, no preamble. Use this exact shape:
+{
+  "prose": "the continuation or expansion text",
+  "rationale": "brief note on creative choices (1-2 sentences)"
+}`;
+}
+
+export function buildUserPrompt(ctx: PromptContext, mode: AiMode): string {
+  if (mode === "soul-check" && ctx.selectedText) {
+    return `Story: "${ctx.storyTitle}"
+
+Selected passage for Soul Check:
 ---
-${draft}
+${ctx.selectedText}
 ---
 
-${beatLine}
+Analyze only this passage. Return JSON insights.`;
+  }
 
-Collaboration level: ${sliderValue}%.`;
+  if (mode === "soul-check") {
+    return `Story: "${ctx.storyTitle}"
+
+Draft excerpt:
+---
+${ctx.draftContent.slice(-4000)}
+---
+
+Analyze this passage. Return JSON insights.`;
+  }
+
+  return `Story: "${ctx.storyTitle}"
+
+Current draft (continue from here):
+---
+${ctx.draftContent.slice(-6000)}
+---
+
+Write the next passage. Return JSON with "prose" and "rationale".`;
 }
