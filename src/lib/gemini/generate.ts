@@ -15,9 +15,16 @@ export interface SoulCheckInsight {
   tone: "encouraging" | "cautionary" | "celebratory";
 }
 
+export interface ColdZone {
+  excerpt: string;
+  insightIndex: number;
+  type: "cold" | "flat";
+}
+
 export interface SoulCheckResult {
   insights: SoulCheckInsight[];
   summary: string;
+  coldZones: ColdZone[];
 }
 
 export interface GhostwriteResult {
