@@ -57,7 +57,7 @@ For instant sign-up and sign-in without verification emails:
 2. Turn **off** **Confirm email**
 3. Save
 
-If you already signed up before this change, delete the old user under [Authentication → Users](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/users) and sign up again.
+If you already signed up before this change and get **Invalid email or password**, run `supabase/fix-unconfirmed-users.sql` in the [SQL Editor](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/sql/new), or delete the old user under [Authentication → Users](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/users) and sign up again.
 
 ### 5. Run the app
 

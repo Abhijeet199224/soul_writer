@@ -41,6 +41,23 @@ export function AuthForm() {
         return;
       }
 
+      const { data: signInAfterSignUp, error: signInAfterSignUpError } =
+        await supabase.auth.signInWithPassword({ email, password });
+
+      if (signInAfterSignUp.session) {
+        router.push("/dashboard");
+        router.refresh();
+        return;
+      }
+
+      if (signInAfterSignUpError) {
+        setError(
+          "Account may exist but is not active yet. In Supabase SQL Editor, run supabase/fix-unconfirmed-users.sql, then try Sign in again. Or delete your user under Authentication → Users and Sign up again.",
+        );
+        setLoading(false);
+        return;
+      }
+
       setMessage("Account created. You can sign in now.");
       setMode("signin");
       setLoading(false);
@@ -55,7 +72,7 @@ export function AuthForm() {
     if (signInError) {
       setError(
         signInError.message.toLowerCase().includes("invalid login credentials")
-          ? "Invalid email or password. Use Sign up if you do not have an account yet."
+          ? "Invalid email or password. If you signed up earlier, your account may be unconfirmed — run supabase/fix-unconfirmed-users.sql in the Supabase SQL Editor, or delete your user and Sign up again."
           : signInError.message,
       );
       setLoading(false);
