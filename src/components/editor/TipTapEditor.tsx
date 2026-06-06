@@ -12,18 +12,19 @@ import {
   Sparkles,
   Strikethrough,
 } from "lucide-react";
-import type { ColdZone } from "@/lib/gemini/generate";
+import type { SoulCheckInsight } from "@/lib/gemini/generate";
 import { normalizeDraftContent } from "@/lib/draft-content";
 import { SoulHighlight } from "@/lib/tiptap/soul-highlight";
 import {
   applySoulCheckHighlights,
+  clearSoulCheckHighlights,
   getInsightIndexAtPos,
 } from "@/lib/soul-check-highlights";
 
 interface TipTapEditorProps {
   content: string;
   onUpdate: (html: string) => void;
-  coldZones?: ColdZone[];
+  soulCheckInsights?: SoulCheckInsight[];
   onHighlightInsight?: (insightIndex: number) => void;
   onSelectionSoulCheck?: (selectedText: string) => void;
   selectionLoading?: boolean;
@@ -60,7 +61,7 @@ function MenuButton({
 export function TipTapEditor({
   content,
   onUpdate,
-  coldZones = [],
+  soulCheckInsights = [],
   onHighlightInsight,
   onSelectionSoulCheck,
   selectionLoading = false,
@@ -118,20 +119,27 @@ export function TipTapEditor({
     }
   }, [content, editor]);
 
-  const appliedZonesRef = useRef("");
+  const appliedInsightsRef = useRef("");
 
   useEffect(() => {
-    if (!editor || editor.isDestroyed || !coldZones.length) return;
-    const key = JSON.stringify(coldZones);
-    if (key === appliedZonesRef.current) return;
-    appliedZonesRef.current = key;
-    applySoulCheckHighlights(editor, coldZones);
-  }, [editor, coldZones]);
+    if (!editor || editor.isDestroyed) return;
+    const key = JSON.stringify(soulCheckInsights);
+    if (key === appliedInsightsRef.current) return;
+    appliedInsightsRef.current = key;
+
+    if (!soulCheckInsights.length) {
+      clearSoulCheckHighlights(editor);
+      return;
+    }
+
+    applySoulCheckHighlights(editor, soulCheckInsights);
+  }, [editor, soulCheckInsights]);
 
   const runSoulCheckOnSelection = useCallback(() => {
     if (!editor || !onSelectionSoulCheck) return;
     const { from, to } = editor.state.selection;
-    const selected = editor.state.doc.textBetween(from, to, " ").trim();
+    if (from === to) return;
+    const selected = editor.state.doc.textBetween(from, to, "\n").trim();
     if (selected.length >= 3) {
       onSelectionSoulCheck(selected);
     }

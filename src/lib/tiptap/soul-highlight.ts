@@ -12,18 +12,13 @@ export const SoulHighlight = Highlight.extend({
           return { "data-insight-index": String(attributes.insightIndex) };
         },
       },
-      zoneType: {
+      severity: {
         default: "cold",
-        parseHTML: (element) => element.getAttribute("data-zone-type") ?? "cold",
+        parseHTML: (element) => element.getAttribute("data-severity") ?? "cold",
         renderHTML: (attributes) => ({
-          "data-zone-type": attributes.zoneType ?? "cold",
+          "data-severity": attributes.severity ?? "cold",
         }),
       },
     };
   },
 });
-
-export const ZONE_COLORS = {
-  cold: "#a5b4fc",
-  flat: "#fcd34d",
-} as const;

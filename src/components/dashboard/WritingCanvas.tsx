@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
 import type { Character, SaveStatus, Story } from "@/lib/types";
-import type { ColdZone } from "@/lib/gemini/generate";
+import type { SoulCheckInsight } from "@/lib/gemini/generate";
 import { htmlToPlainText } from "@/lib/draft-content";
 import { splitTextByCharacters } from "@/lib/character-highlight";
 import { CharacterHoverCard } from "@/components/editor/CharacterHoverCard";
@@ -36,7 +36,7 @@ interface WritingCanvasProps {
   focusMode: boolean;
   onSelectionSoulCheck: (selectedText: string) => Promise<void>;
   selectionLoading: boolean;
-  coldZones?: ColdZone[];
+  soulCheckInsights?: SoulCheckInsight[];
   onHighlightInsight?: (insightIndex: number) => void;
 }
 
@@ -64,7 +64,7 @@ export function WritingCanvas({
   focusMode,
   onSelectionSoulCheck,
   selectionLoading,
-  coldZones = [],
+  soulCheckInsights = [],
   onHighlightInsight,
 }: WritingCanvasProps) {
   const plainDraft = useMemo(() => htmlToPlainText(draft), [draft]);
@@ -129,7 +129,7 @@ export function WritingCanvas({
             onDraftChange(html);
             onClearHover();
           }}
-          coldZones={coldZones}
+          soulCheckInsights={soulCheckInsights}
           onHighlightInsight={onHighlightInsight}
           onSelectionSoulCheck={(text) => void onSelectionSoulCheck(text)}
           selectionLoading={selectionLoading}

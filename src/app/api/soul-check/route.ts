@@ -52,22 +52,28 @@ export async function POST(request: Request) {
     }
 
     const clampedSlider = Math.min(100, Math.max(0, sliderValue));
+    const manuscript = selectedText.trim();
+
     const result = await generateWithGemini(
       {
         storyTitle: story.title,
         bible,
         sliderValue: clampedSlider,
-        draftContent: "",
-        selectedText: selectedText.trim(),
+        draftContent: manuscript,
+        selectedText: manuscript,
       },
       "soul-check",
     );
 
-    return NextResponse.json({
-      ...result,
-      charactersUsed: getCharactersUsedInText(selectedText, bible.characters),
-      sliderValue: clampedSlider,
-    });
+    if (result && "insights" in result) {
+      return NextResponse.json({
+        insights: result.insights,
+        charactersUsed: getCharactersUsedInText(manuscript, bible.characters),
+        sliderValue: clampedSlider,
+      });
+    }
+
+    return NextResponse.json({ error: "Unexpected AI response" }, { status: 500 });
   } catch (err) {
     console.error("POST /api/soul-check:", err);
     const raw = err instanceof Error ? err.message : "Soul Check failed";

@@ -25,34 +25,29 @@ export function buildSystemPrompt(ctx: PromptContext, mode: AiMode): string {
   const slider = sliderLabel(ctx.sliderValue);
 
   if (mode === "soul-check") {
-    return `You are the Soul Checker — an empathetic editorial companion for fiction writers.
-Your role is to read a passage and return structured, emotionally intelligent feedback.
+    return `You are a brutally honest, analytical Literary Editor — not a cheerleader.
+Your job is to find emotionally flat, robotic, clichéd, or distant prose in the author's manuscript and name it precisely.
 
 ${bibleBlock}
 
 AI Collaboration Slider: ${ctx.sliderValue}/100 (${slider}).
-At low values, be gentle and suggestive. At high values, be direct and specific.
+Be direct. No praise for mediocre writing. Every critique must cite a specific line.
 
-You MUST respond with valid JSON only — no markdown fences, no preamble. Use this exact shape:
-{
-  "insights": [
-    {
-      "title": "short headline",
-      "body": "2-4 sentences of feedback",
-      "tone": "encouraging" | "cautionary" | "celebratory"
-    }
-  ],
-  "summary": "one sentence overall read",
-  "coldZones": [
-    {
-      "excerpt": "exact sentence or phrase copied from the passage",
-      "insightIndex": 0,
-      "type": "cold" | "flat"
-    }
-  ]
-}
-
-Provide 2-4 insights. Include 1-3 coldZones for emotionally flat or cold passages (use type "cold" for distant prose, "flat" for low-energy beats). Each excerpt MUST be an exact substring from the analyzed text. Reference character names and lore from the Story Bible when relevant.`;
+CRITICAL OUTPUT RULES — VIOLATION BREAKS THE FRONTEND:
+1. Return ONLY a raw JSON array. No markdown fences. No preamble. No postscript. No conversational pleasantries.
+2. Each object MUST use this exact schema:
+[
+  {
+    "targetText": "The exact sentence or phrase copied VERBATIM and WORD-FOR-WORD from the user's manuscript.",
+    "severity": "cold" | "lukewarm",
+    "critique": "Why this specific line sounds robotic, a cliché, or lacks emotional resonance.",
+    "soulPrompt": "A deep psychological or sensory question that guides the author to rewrite it manually."
+  }
+]
+3. "targetText" MUST be a perfect substring of the manuscript you are analyzing. Copy it character-for-character including punctuation. If you cannot find an exact match, OMIT that entry entirely.
+4. Use severity "cold" for emotionally distant or clinical prose; "lukewarm" for clichés, telling-not-showing, or low-resonance beats.
+5. Return an empty array [] if the passage has no flat spots worth flagging.
+6. Provide 1–5 entries maximum. Skip generic summaries — every entry must anchor to a quoted line.`;
   }
 
   return `You are a ghostwriting collaborator embedded in Soul Writer.
@@ -75,23 +70,23 @@ export function buildUserPrompt(ctx: PromptContext, mode: AiMode): string {
   if (mode === "soul-check" && ctx.selectedText) {
     return `Story: "${ctx.storyTitle}"
 
-Selected passage for Soul Check:
+Manuscript passage to audit (copy targetText from this text ONLY):
 ---
 ${ctx.selectedText}
 ---
 
-Analyze only this passage. Return JSON insights.`;
+Return the JSON array of editorial flags.`;
   }
 
   if (mode === "soul-check") {
     return `Story: "${ctx.storyTitle}"
 
-Draft excerpt:
+Manuscript excerpt to audit (copy targetText from this text ONLY):
 ---
 ${ctx.draftContent.slice(-4000)}
 ---
 
-Analyze this passage. Return JSON insights.`;
+Return the JSON array of editorial flags.`;
   }
 
   return `Story: "${ctx.storyTitle}"
