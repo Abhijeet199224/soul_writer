@@ -11,6 +11,7 @@ A wholesome writer app with **Context Interconnectivity** — character profiles
 - Dashboard to create and open stories
 - Character Bible with structured profiles (name, role, age, appearance, flaw, motivation)
 - Smart Codex Editor — character names underline and open a hover card from the bible
+- **Unified 3-panel dashboard** — Navigator (outline, characters, settings) · Writing Canvas · AI Hub
 - **Ghostwriter Slider** + **Soul Checker** — Gemini API routes pull character context from Supabase automatically
 
 ## Quick start
@@ -87,7 +88,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001), sign up, create a story, add characters, then switch to the Smart Codex Editor tab.
+Open [http://localhost:3001](http://localhost:3001), sign up, create a story, then use the unified dashboard: Navigator on the left, Writing Canvas in the center, AI Hub on the right.
 
 ## Architecture
 

@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 
 interface AppHeaderProps {
   email?: string | null;
+  fullWidth?: boolean;
 }
 
-export function AppHeader({ email }: AppHeaderProps) {
+export function AppHeader({ email, fullWidth }: AppHeaderProps) {
   const router = useRouter();
 
   async function handleSignOut() {
@@ -20,7 +21,9 @@ export function AppHeader({ email }: AppHeaderProps) {
 
   return (
     <header className="border-b border-amber-200/50 bg-white/70 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <div
+        className={`flex items-center justify-between px-6 py-3 ${fullWidth ? "w-full" : "mx-auto max-w-6xl"}`}
+      >
         <Link href="/dashboard" className="group">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
             Soul Writer

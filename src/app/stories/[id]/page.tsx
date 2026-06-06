@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AppHeader } from "@/components/layout/AppHeader";
-import { StoryWorkspace } from "@/components/stories/StoryWorkspace";
+import { StoryDashboard } from "@/components/dashboard/StoryDashboard";
 import { createClient } from "@/lib/supabase/server";
 import type { Character, Story } from "@/lib/types";
 
@@ -41,20 +40,12 @@ export default async function StoryPage({ params }: StoryPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff7ed,_#f5f5f4_55%)]">
-      <AppHeader email={user.email} />
-      <main className="mx-auto max-w-6xl px-6 py-10">
-        <Link
-          href="/dashboard"
-          className="mb-6 inline-flex text-sm text-stone-500 transition hover:text-stone-800"
-        >
-          ← Back to stories
-        </Link>
-        <StoryWorkspace
-          story={story as Story}
-          initialCharacters={(characters as Character[]) ?? []}
-        />
-      </main>
+    <div className="flex min-h-screen flex-col bg-stone-100">
+      <AppHeader email={user.email} fullWidth />
+      <StoryDashboard
+        story={story as Story}
+        initialCharacters={(characters as Character[]) ?? []}
+      />
     </div>
   );
 }
