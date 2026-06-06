@@ -3,6 +3,10 @@
     {
       "name": "Soul Writer Dev",
       "command": "npm run dev"
+    },
+    {
+      "name": "Public Preview Tunnel",
+      "command": "npx --yes localtunnel --port 3001"
     }
   ]
 }
