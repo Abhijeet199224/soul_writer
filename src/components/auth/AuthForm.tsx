@@ -70,9 +70,12 @@ export function AuthForm() {
     });
 
     if (signInError) {
+      const invalid = signInError.message
+        .toLowerCase()
+        .includes("invalid login credentials");
       setError(
-        signInError.message.toLowerCase().includes("invalid login credentials")
-          ? "Invalid email or password. If you signed up earlier, your account may be unconfirmed — run supabase/fix-unconfirmed-users.sql in the Supabase SQL Editor, or delete your user and Sign up again."
+        invalid
+          ? `Can't sign in as ${email}. Your account is likely stuck from an earlier signup. Use the fix steps below.`
           : signInError.message,
       );
       setLoading(false);
@@ -175,6 +178,30 @@ export function AuthForm() {
               : "Create account"}
         </button>
       </form>
+
+      {error && (
+        <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-xs leading-relaxed text-stone-700">
+          <p className="font-semibold text-stone-900">Fix stuck login</p>
+          <p className="mt-2">
+            <strong>Fastest:</strong> In{" "}
+            <a
+              href="https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/users"
+              className="text-amber-800 underline"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Authentication → Users
+            </a>
+            , delete your user, then <strong>Sign up</strong> again here.
+          </p>
+          <p className="mt-2">
+            <strong>Or in SQL Editor</strong>, run the delete block in{" "}
+            <code className="rounded bg-white px-1">supabase/fix-unconfirmed-users.sql</code>{" "}
+            using your email:{" "}
+            <code className="break-all rounded bg-white px-1">{email || "your@email.com"}</code>
+          </p>
+        </div>
+      )}
     </div>
   );
 }

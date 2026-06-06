@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "db:apply": "node scripts/apply-schema.mjs",
-    "setup:check": "node --env-file=.env.local scripts/verify-setup.mjs"
+    "setup:check": "node --env-file=.env.local scripts/verify-setup.mjs",
+    "auth:list": "node --env-file=.env.local scripts/fix-auth-user.mjs list",
+    "auth:confirm-all": "node --env-file=.env.local scripts/fix-auth-user.mjs confirm-all",
+    "auth:reset": "node --env-file=.env.local scripts/fix-auth-user.mjs reset"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
