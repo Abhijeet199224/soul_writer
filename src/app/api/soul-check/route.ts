@@ -70,7 +70,10 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     console.error("POST /api/soul-check:", err);
-    const message = err instanceof Error ? err.message : "Soul Check failed";
+    const raw = err instanceof Error ? err.message : "Soul Check failed";
+    const message = raw.includes("leaked")
+      ? "Gemini API key was revoked. Create a new key at https://aistudio.google.com/apikey and update GEMINI_API_KEY in .env.local, then restart the dev server."
+      : raw;
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

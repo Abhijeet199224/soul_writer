@@ -37,6 +37,13 @@ if (!url || !key || key.includes("your_")) {
 }
 console.log("Supabase env vars ✓");
 
+const gemini = process.env.GEMINI_API_KEY;
+if (!gemini || gemini.includes("your_")) {
+  console.warn("⚠ GEMINI_API_KEY missing — Ghostwriter/Soul Checker will fail until set.");
+} else {
+  console.log("Gemini API key ✓");
+}
+
 const headers = { apikey: key, Authorization: `Bearer ${key}` };
 const auth = await fetch(`${url}/auth/v1/health`, { headers });
 const stories = await fetch(`${url}/rest/v1/stories?select=id&limit=1`, { headers });

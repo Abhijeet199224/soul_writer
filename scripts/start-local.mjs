@@ -15,12 +15,6 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 3001;
 const ENV_PATH = join(root, ".env.local");
 
-const ENV_CONTENT = `NEXT_PUBLIC_SUPABASE_URL=https://wqdbvjxsxcjwifnfgkjf.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_s84fExZo-ByvqVqJ2ymrDg_eP_LE6GM
-NEXT_PUBLIC_SITE_URL=http://localhost:3001
-GEMINI_API_KEY=AIzaSyBGAkeFlYDO30qzZK9lOOwWDEXfwXFWY7g
-`;
-
 function log(step, msg) {
   console.log(`[${step}] ${msg}`);
 }
@@ -86,12 +80,11 @@ async function waitForServer(maxMs = 30000) {
 
 // 1. .env.local
 if (!existsSync(ENV_PATH)) {
-  const { writeFileSync } = await import("node:fs");
-  writeFileSync(ENV_PATH, ENV_CONTENT, "utf8");
-  log("env", "Created .env.local");
-} else {
-  log("env", ".env.local OK");
+  execSync("node scripts/ensure-env.mjs", { stdio: "inherit", cwd: root });
+  console.error("\nAdd your keys to .env.local, then run npm run local:start again.\n");
+  process.exit(1);
 }
+log("env", ".env.local OK");
 
 // 2. node_modules
 if (!existsSync(join(root, "node_modules"))) {

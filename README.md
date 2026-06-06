@@ -105,11 +105,15 @@ npm run auth:reset -- your@email.com yournewpassword
 ### 5. Enable Gemini (Ghostwriter + Soul Checker)
 
 1. Get an API key from [Google AI Studio](https://aistudio.google.com/apikey)
-2. Add to `.env.local`:
+2. Add to `.env.local` only (never commit real keys):
 
 ```bash
 GEMINI_API_KEY=your_key_here
 ```
+
+3. Restart the dev server after changing `.env.local`.
+
+**If you see "API key was reported as leaked":** Google revoked the key because it was exposed publicly. [Create a new key](https://aistudio.google.com/apikey), delete the old one, update `.env.local`, and restart.
 
 The `/api/ai` route fetches characters from your story in Supabase and injects them into every Gemini prompt — no manual copy-paste.
 

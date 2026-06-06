@@ -98,8 +98,11 @@ export async function POST(request: Request) {
       charactersUsed,
     });
   } catch (error) {
-    const message =
+    const raw =
       error instanceof Error ? error.message : "AI generation failed";
+    const message = raw.includes("leaked")
+      ? "Gemini API key was revoked. Create a new key at https://aistudio.google.com/apikey and update GEMINI_API_KEY in .env.local, then restart the dev server."
+      : raw;
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
