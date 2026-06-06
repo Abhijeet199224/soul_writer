@@ -88,7 +88,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001) (or [http://127.0.0.1:3001](http://127.0.0.1:3001) if `localhost` refuses the connection), sign up, create a story, then use the unified dashboard: Navigator on the left, Writing Canvas in the center, AI Hub on the right.
+Open [http://localhost:3001](http://localhost:3001), sign up, create a story, then use the unified dashboard: Navigator on the left, Writing Canvas in the center, AI Hub on the right.
 
 ## Architecture
 
