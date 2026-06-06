@@ -24,7 +24,7 @@ export function AuthForm() {
     const supabase = createClient();
 
     if (mode === "signup") {
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
@@ -35,7 +35,15 @@ export function AuthForm() {
         return;
       }
 
-      setMessage("Account created. You can sign in now.");
+      if (data.session) {
+        router.push("/dashboard");
+        router.refresh();
+        return;
+      }
+
+      setMessage(
+        "Account created. Check your email for a confirmation link, then sign in.",
+      );
       setMode("signin");
       setLoading(false);
       return;
@@ -47,7 +55,14 @@ export function AuthForm() {
     });
 
     if (signInError) {
-      setError(signInError.message);
+      const message = signInError.message.toLowerCase();
+      if (message.includes("invalid login credentials")) {
+        setError(
+          "Invalid email or password. If you just signed up, confirm your email first (check inbox and spam). Otherwise use Sign up to create an account.",
+        );
+      } else {
+        setError(signInError.message);
+      }
       setLoading(false);
       return;
     }
@@ -67,6 +82,10 @@ export function AuthForm() {
         </h1>
         <p className="mt-2 text-sm text-stone-600">
           Build character bibles that feed your editor automatically.
+        </p>
+        <p className="mt-3 text-xs text-stone-500">
+          New here? Use Sign up first. You may need to confirm your email before
+          signing in.
         </p>
       </div>
 

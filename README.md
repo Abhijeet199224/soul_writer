@@ -53,7 +53,7 @@ SUPABASE_DB_URL="postgresql://postgres.[ref]:[password]@..." npm run db:apply
 
 In [Authentication → Providers](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/providers), ensure **Email** is enabled.
 
-For local dev, you may want to disable email confirmation under Authentication → Settings.
+For local dev, disable email confirmation under [Authentication → Sign In / Providers → Email](https://supabase.com/dashboard/project/wqdbvjxsxcjwifnfgkjf/auth/providers) → turn off **Confirm email**. Otherwise you must click the link in your inbox before signing in.
 
 ### 5. Run the app
 
