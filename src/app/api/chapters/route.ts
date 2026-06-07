@@ -115,6 +115,8 @@ export async function POST(request: Request) {
       sceneBeat,
       plotObjectives,
       plotBeats,
+      title,
+      act,
       activeChapterId,
       settingNotes,
       sliderValue,
@@ -125,6 +127,8 @@ export async function POST(request: Request) {
       sceneBeat?: string;
       plotObjectives?: string;
       plotBeats?: unknown;
+      title?: string;
+      act?: string;
       activeChapterId?: string;
       settingNotes?: string;
       sliderValue?: number;
@@ -176,6 +180,8 @@ export async function POST(request: Request) {
       if (sceneBeat !== undefined) chapterRow.scene_beat = sceneBeat;
       if (plotObjectives !== undefined) chapterRow.plot_objectives = plotObjectives;
       if (plotBeats !== undefined) chapterRow.plot_beats = plotBeats;
+      if (title !== undefined) chapterRow.title = title;
+      if (act !== undefined) chapterRow.act = act.trim();
 
       const { error: chapterError } = await supabase
         .from("story_chapters")

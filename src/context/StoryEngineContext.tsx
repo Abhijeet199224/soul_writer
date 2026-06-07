@@ -36,6 +36,12 @@ import {
   enqueueCascadeRetry,
   flushCascadeRetryQueue,
 } from "@/lib/cascade-retry-queue";
+import {
+  addPlotBeat as appendPlotBeat,
+  reorderPlotBeats,
+  removePlotBeat as dropPlotBeat,
+  renamePlotBeat as relabelPlotBeat,
+} from "@/lib/plot-beats";
 import type {
   GhostwriteAiResult,
   SoulCheckAiResult,
@@ -81,6 +87,10 @@ export interface WorkspaceSessionContext {
   plotObjectives: string;
   sceneBeat: string;
   activePlotBeatTitle: string | null;
+}
+
+interface ChapterDeletePrompt {
+  chapter: StoryChapter;
 }
 
 interface StoryEngineContextValue {
@@ -166,6 +176,17 @@ interface StoryEngineContextValue {
   addingChapter: boolean;
   chapterTitleFocusToken: number;
   setChapterTitle: (title: string) => void;
+  setChapterAct: (act: string) => void;
+  addPlotBeat: () => void;
+  renamePlotBeat: (beatId: string, title: string) => void;
+  removePlotBeat: (beatId: string) => void;
+  movePlotBeat: (beatId: string, direction: "up" | "down") => void;
+  requestChapterDelete: (chapter: StoryChapter) => void;
+  confirmChapterDelete: () => Promise<void>;
+  dismissChapterDelete: () => void;
+  chapterDeletePrompt: ChapterDeletePrompt | null;
+  deleteChapterLoading: boolean;
+  reloadChapters: () => Promise<void>;
   codexOpen: boolean;
   setCodexOpen: (open: boolean) => void;
   toneAlignmentLoading: boolean;
@@ -247,6 +268,9 @@ export function StoryEngineProvider({
   );
   const [addingChapter, setAddingChapter] = useState(false);
   const [chapterTitleFocusToken, setChapterTitleFocusToken] = useState(0);
+  const [chapterDeletePrompt, setChapterDeletePrompt] =
+    useState<ChapterDeletePrompt | null>(null);
+  const [deleteChapterLoading, setDeleteChapterLoading] = useState(false);
   const [codexOpen, setCodexOpen] = useState(false);
   const [toneAlignmentLoading, setToneAlignmentLoading] = useState(false);
   const [toneAlignmentReport, setToneAlignmentReport] = useState<string | null>(
@@ -310,12 +334,18 @@ export function StoryEngineProvider({
       chapterId: activeChapter?.id ?? "",
       draftContent: draft,
       sceneBeat: beat,
+      title: activeChapter?.title,
+      act: activeChapter?.act,
       plotObjectives: activeChapter?.plot_objectives,
+      plotBeats: activeChapter?.plot_beats,
       expectedUpdatedAt: activeChapter?.updated_at ?? null,
     }),
     [
       activeChapter?.id,
+      activeChapter?.title,
+      activeChapter?.act,
       activeChapter?.plot_objectives,
+      activeChapter?.plot_beats,
       activeChapter?.updated_at,
       draft,
       beat,
@@ -343,13 +373,6 @@ export function StoryEngineProvider({
     [initialWorkspace],
   );
 
-  const { saveStatus } = useDebouncedChapterSave({
-    chapterSnapshot,
-    metaSnapshot,
-    enabled: chaptersLoaded && Boolean(activeChapter?.id),
-    baselineKey,
-  });
-
   const loadChapters = useCallback(async () => {
     const response = await fetch(`/api/chapters?storyId=${story.id}`);
     const data = await response.json();
@@ -360,6 +383,21 @@ export function StoryEngineProvider({
     if (data.sliderValue !== undefined) setSliderValue(data.sliderValue);
     setChaptersLoaded(true);
   }, [story.id]);
+
+  const handleSaveConflict = useCallback(() => {
+    setInlineNotice(
+      "This chapter was updated elsewhere. Reloading the latest manuscript…",
+    );
+    void loadChapters();
+  }, [loadChapters]);
+
+  const { saveStatus } = useDebouncedChapterSave({
+    chapterSnapshot,
+    metaSnapshot,
+    enabled: chaptersLoaded && Boolean(activeChapter?.id),
+    baselineKey,
+    onSaveConflict: handleSaveConflict,
+  });
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial chapter fetch
@@ -452,6 +490,103 @@ export function StoryEngineProvider({
     [updateChapterMeta],
   );
 
+  const setChapterAct = useCallback(
+    (act: string) => {
+      updateChapterMeta({ act: act.trim() });
+    },
+    [updateChapterMeta],
+  );
+
+  const addPlotBeat = useCallback(() => {
+    if (!activeChapter) return;
+    updateChapterInState(activeChapter.id, {
+      plot_beats: appendPlotBeat(activeChapter.plot_beats),
+    });
+  }, [activeChapter, updateChapterInState]);
+
+  const renamePlotBeat = useCallback(
+    (beatId: string, title: string) => {
+      if (!activeChapter) return;
+      const previous = activeChapter.plot_beats.find((beat) => beat.id === beatId);
+      const nextBeats = relabelPlotBeat(activeChapter.plot_beats, beatId, title);
+      const patch: Partial<StoryChapter> = { plot_beats: nextBeats };
+      if (previous && activeChapter.scene_beat === previous.title) {
+        patch.scene_beat = title.trim() || previous.title;
+        setActivePlotBeatTitle(patch.scene_beat);
+      }
+      updateChapterInState(activeChapter.id, patch);
+    },
+    [activeChapter, updateChapterInState],
+  );
+
+  const removePlotBeat = useCallback(
+    (beatId: string) => {
+      if (!activeChapter) return;
+      const removed = activeChapter.plot_beats.find((beat) => beat.id === beatId);
+      const nextBeats = dropPlotBeat(activeChapter.plot_beats, beatId);
+      const patch: Partial<StoryChapter> = { plot_beats: nextBeats };
+      if (removed && activeChapter.scene_beat === removed.title) {
+        patch.scene_beat = "";
+        setActivePlotBeatTitle(null);
+      }
+      updateChapterInState(activeChapter.id, patch);
+    },
+    [activeChapter, updateChapterInState],
+  );
+
+  const movePlotBeat = useCallback(
+    (beatId: string, direction: "up" | "down") => {
+      if (!activeChapter) return;
+      updateChapterInState(activeChapter.id, {
+        plot_beats: reorderPlotBeats(activeChapter.plot_beats, beatId, direction),
+      });
+    },
+    [activeChapter, updateChapterInState],
+  );
+
+  const requestChapterDelete = useCallback((chapter: StoryChapter) => {
+    setChapterDeletePrompt({ chapter });
+  }, []);
+
+  const dismissChapterDelete = useCallback(() => {
+    setChapterDeletePrompt(null);
+  }, []);
+
+  const confirmChapterDelete = useCallback(async () => {
+    if (!chapterDeletePrompt) return;
+    const { chapter } = chapterDeletePrompt;
+    setDeleteChapterLoading(true);
+
+    try {
+      const response = await fetch("/api/chapters/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storyId: story.id,
+          chapterId: chapter.id,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to delete chapter");
+      }
+
+      setChapters((prev) => prev.filter((item) => item.id !== chapter.id));
+      setActiveChapterId(data.activeChapterId as string | null);
+      setChapterDeletePrompt(null);
+      setActiveInsightIndex(null);
+      clearRewriteStates();
+      setSoulCheckResult(null);
+      setGhostwriteResult(null);
+    } catch (error) {
+      setInlineNotice(
+        error instanceof Error ? error.message : "Failed to delete chapter",
+      );
+    } finally {
+      setDeleteChapterLoading(false);
+    }
+  }, [chapterDeletePrompt, story.id, clearRewriteStates]);
+
   const addChapter = useCallback(async () => {
     setAddingChapter(true);
     setAiError(null);
@@ -529,13 +664,17 @@ export function StoryEngineProvider({
 
   useEffect(() => {
     if (!chaptersLoaded) return;
-    void flushCascadeRetryQueue(story.id);
+    void flushCascadeRetryQueue(story.id).then((flushed) => {
+      if (flushed > 0) void loadChapters();
+    });
     function onOnline() {
-      void flushCascadeRetryQueue(story.id);
+      void flushCascadeRetryQueue(story.id).then((flushed) => {
+        if (flushed > 0) void loadChapters();
+      });
     }
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
-  }, [chaptersLoaded, story.id]);
+  }, [chaptersLoaded, story.id, loadChapters]);
 
   const runToneAlignmentCheck = useCallback(async () => {
     if (!plainDraft.trim()) {
@@ -1285,6 +1424,17 @@ export function StoryEngineProvider({
     addingChapter,
     chapterTitleFocusToken,
     setChapterTitle,
+    setChapterAct,
+    addPlotBeat,
+    renamePlotBeat,
+    removePlotBeat,
+    movePlotBeat,
+    requestChapterDelete,
+    confirmChapterDelete,
+    dismissChapterDelete,
+    chapterDeletePrompt,
+    deleteChapterLoading,
+    reloadChapters: loadChapters,
     codexOpen,
     setCodexOpen,
     toneAlignmentLoading,

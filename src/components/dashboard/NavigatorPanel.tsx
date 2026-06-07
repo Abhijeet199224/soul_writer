@@ -6,6 +6,7 @@ import type { Character } from "@/lib/types";
 import { useStoryEngine } from "@/context/StoryEngineContext";
 import { CharacterForm } from "@/components/characters/CharacterForm";
 import { ManuscriptSearchPanel } from "@/components/dashboard/ManuscriptSearchPanel";
+import { PlotTrajectoryEditor } from "@/components/dashboard/PlotTrajectoryEditor";
 
 type NavigatorSection = "chapters" | "characters" | "settings";
 
@@ -19,6 +20,7 @@ export function NavigatorPanel() {
   const {
     story,
     chapters,
+    activeChapter,
     activeChapterId,
     switchChapter,
     selectPlotBeat,
@@ -28,9 +30,15 @@ export function NavigatorPanel() {
     characters,
     handleCharacterSaved,
     requestCharacterDelete,
+    requestChapterDelete,
     settingNotes,
     setSettingNotes,
     updateChapterMeta,
+    setChapterAct,
+    addPlotBeat,
+    renamePlotBeat,
+    removePlotBeat,
+    movePlotBeat,
     navigatorCollapsed,
     setNavigatorCollapsed,
   } = useStoryEngine();
@@ -51,10 +59,6 @@ export function NavigatorPanel() {
         </button>
       </aside>
     );
-  }
-
-  async function handleDeleteCharacter(character: Character) {
-    requestCharacterDelete(character);
   }
 
   return (
@@ -105,7 +109,8 @@ export function NavigatorPanel() {
         {section === "chapters" && (
           <div className="space-y-3">
             <p className="text-xs text-stone-500">
-              Each Act is a chapter workspace. Select one to edit its manuscript.
+              Each Act is a chapter workspace. Edit trajectory beats, rename the
+              Act label, or delete Acts you no longer need.
             </p>
             {!chaptersLoaded ? (
               <div className="space-y-3">
@@ -122,79 +127,96 @@ export function NavigatorPanel() {
               </div>
             ) : (
               chapters.map((chapter) => {
-              const isActive = chapter.id === activeChapterId;
-              return (
-                <div
-                  key={chapter.id}
-                  className={`w-full rounded-xl border p-3 transition ${
-                    isActive
-                      ? "border-amber-400 bg-amber-50/70 ring-1 ring-amber-300/60"
-                      : "border-stone-200 bg-stone-50"
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => switchChapter(chapter.id)}
-                    title={`Open ${chapter.act} workspace — loads manuscript without affecting undo history`}
-                    className="w-full text-left"
+                const isActive = chapter.id === activeChapterId;
+                return (
+                  <div
+                    key={chapter.id}
+                    className={`w-full rounded-xl border p-3 transition ${
+                      isActive
+                        ? "border-amber-400 bg-amber-50/70 ring-1 ring-amber-300/60"
+                        : "border-stone-200 bg-stone-50"
+                    }`}
                   >
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                      {chapter.act}
-                    </span>
-                    <p className="mt-1 font-serif text-sm font-medium text-stone-900">
-                      {chapter.title}
-                    </p>
-                    {chapter.plot_objectives && (
-                      <p className="mt-1 line-clamp-2 text-xs text-stone-500">
-                        {chapter.plot_objectives}
-                      </p>
-                    )}
-                  </button>
+                    <div className="flex items-start justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => switchChapter(chapter.id)}
+                        title={`Open ${chapter.act} workspace`}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        {isActive ? (
+                          <input
+                            value={chapter.act}
+                            onChange={(event) =>
+                              setChapterAct(event.target.value)
+                            }
+                            onClick={(event) => event.stopPropagation()}
+                            className="w-full rounded-md border border-amber-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 outline-none focus:border-amber-400"
+                          />
+                        ) : (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                            {chapter.act}
+                          </span>
+                        )}
+                        <p className="mt-1 font-serif text-sm font-medium text-stone-900">
+                          {chapter.title || "Untitled chapter"}
+                        </p>
+                        {chapter.plot_objectives && (
+                          <p className="mt-1 line-clamp-2 text-xs text-stone-500">
+                            {chapter.plot_objectives}
+                          </p>
+                        )}
+                      </button>
+                      {chapters.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => requestChapterDelete(chapter)}
+                          className="shrink-0 rounded-md px-2 py-1 text-[10px] text-red-600 hover:bg-red-50"
+                          title="Delete this Act"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
 
-                  {chapter.plot_beats.length > 0 && (
-                    <ul className="mt-3 space-y-1 border-t border-stone-200/80 pt-2">
-                      <li className="text-[10px] font-semibold uppercase tracking-wide text-stone-400">
-                        Plot trajectory beats
-                      </li>
-                      {chapter.plot_beats.map((plotBeat) => {
-                        const beatActive =
-                          isActive && chapter.scene_beat === plotBeat.title;
-                        return (
-                          <li key={plotBeat.id}>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                selectPlotBeat(chapter.id, plotBeat.title)
-                              }
-                              title={`Focus this scene beat in the canvas header and AI context — ${plotBeat.title}`}
-                              className={`w-full rounded-lg px-2 py-1.5 text-left text-[11px] transition ${
-                                beatActive
-                                  ? "bg-amber-100 font-medium text-amber-900"
-                                  : "text-stone-600 hover:bg-stone-100 hover:text-stone-900"
-                              }`}
+                    {isActive ? (
+                      <PlotTrajectoryEditor
+                        beats={chapter.plot_beats}
+                        activeBeatTitle={chapter.scene_beat}
+                        onSelectBeat={(title) =>
+                          selectPlotBeat(chapter.id, title)
+                        }
+                        onAddBeat={addPlotBeat}
+                        onRenameBeat={renamePlotBeat}
+                        onRemoveBeat={removePlotBeat}
+                        onMoveBeat={movePlotBeat}
+                      />
+                    ) : (
+                      chapter.plot_beats.length > 0 && (
+                        <ul className="mt-3 space-y-1 border-t border-stone-200/80 pt-2">
+                          {chapter.plot_beats.map((plotBeat) => (
+                            <li
+                              key={plotBeat.id}
+                              className="px-2 py-1 text-[11px] text-stone-600"
                             >
                               • {plotBeat.title}
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              );
-            })
+                            </li>
+                          ))}
+                        </ul>
+                      )
+                    )}
+                  </div>
+                );
+              })
             )}
 
-            {chaptersLoaded && activeChapterId && (
+            {chaptersLoaded && activeChapter && (
               <div className="rounded-xl border border-dashed border-stone-200 p-3">
                 <label className="text-[10px] font-semibold uppercase tracking-wide text-stone-400">
                   Chapter objectives
                 </label>
                 <textarea
-                  value={
-                    chapters.find((c) => c.id === activeChapterId)
-                      ?.plot_objectives ?? ""
-                  }
+                  value={activeChapter.plot_objectives}
                   onChange={(e) =>
                     updateChapterMeta({ plot_objectives: e.target.value })
                   }
@@ -212,7 +234,7 @@ export function NavigatorPanel() {
               type="button"
               onClick={() => void addChapter()}
               disabled={addingChapter}
-              title="Create a new Act/Chapter workspace with an empty canvas"
+              title="Create a new Act/Chapter workspace with default trajectory beats"
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-amber-300 bg-amber-50/60 px-3 py-3 text-sm font-medium text-amber-900 transition hover:border-amber-400 hover:bg-amber-50 disabled:opacity-60"
             >
               {addingChapter ? "Creating chapter…" : "+ Add Chapter / Act"}
@@ -284,7 +306,7 @@ export function NavigatorPanel() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDeleteCharacter(character)}
+                    onClick={() => requestCharacterDelete(character)}
                     className="text-xs text-red-600 hover:text-red-800"
                   >
                     Delete

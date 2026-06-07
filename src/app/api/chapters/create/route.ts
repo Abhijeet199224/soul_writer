@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeChapter } from "@/lib/chapters";
+import { DEFAULT_NEW_ACT_PLOT_BEATS } from "@/lib/plot-beats";
 
 export async function POST(request: Request) {
   try {
@@ -59,8 +60,9 @@ export async function POST(request: Request) {
         act,
         title: "",
         sequence,
-        plot_beats: [],
-        plot_objectives: "",
+        plot_beats: DEFAULT_NEW_ACT_PLOT_BEATS,
+        plot_objectives:
+          "Define what this Act must accomplish before the story moves forward.",
         scene_beat: "",
         draft_content: "<p></p>",
       })

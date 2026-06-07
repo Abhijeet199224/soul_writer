@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Character, StoryChapter } from "@/lib/types";
 import type { StoryBiblePayload } from "@/lib/story-bible-context";
 import { parseOutlineJson } from "@/lib/story-bible-context";
+import { buildOutlineFromChapters } from "@/lib/plot-beats";
 import { normalizeChapter } from "@/lib/chapters";
 
 export async function fetchStoryChapter(
@@ -41,7 +42,7 @@ export async function fetchStoryBible(
   storyId: string,
   chapterId?: string | null,
 ): Promise<StoryBiblePayload | null> {
-  const [charsRes, workspaceRes, chapter] = await Promise.all([
+  const [charsRes, workspaceRes, chaptersRes, chapter] = await Promise.all([
     supabase
       .from("characters")
       .select("*")
@@ -52,6 +53,11 @@ export async function fetchStoryBible(
       .select("outline_json, setting_notes, scene_beat, active_chapter_id")
       .eq("story_id", storyId)
       .maybeSingle(),
+    supabase
+      .from("story_chapters")
+      .select("act, title, plot_beats")
+      .eq("story_id", storyId)
+      .order("sequence"),
     fetchStoryChapter(supabase, storyId, chapterId),
   ]);
 
@@ -68,9 +74,18 @@ export async function fetchStoryBible(
       ? await fetchStoryChapter(supabase, storyId, ws.active_chapter_id)
       : null);
 
+  const chapterOutline = buildOutlineFromChapters(
+    (chaptersRes.data ?? []).map((row) => ({
+      act: String(row.act),
+      title: String(row.title),
+      plot_beats: normalizeChapter(row as Record<string, unknown>).plot_beats,
+    })),
+  );
+  const legacyOutline = parseOutlineJson(ws?.outline_json);
+
   return {
     characters,
-    outline: parseOutlineJson(ws?.outline_json),
+    outline: chapterOutline.length ? chapterOutline : legacyOutline,
     settingNotes: ws?.setting_notes ?? "",
     sceneBeat: activeChapter?.scene_beat ?? ws?.scene_beat ?? "",
     chapter: activeChapter,
