@@ -1,4 +1,6 @@
+import { createDocument } from "@tiptap/core";
 import type { Editor } from "@tiptap/react";
+import { normalizeDraftContent } from "@/lib/draft-content";
 
 export function getCursorPrefixFromEditor(editor: Editor | null): string {
   if (!editor) return "";
@@ -27,6 +29,30 @@ export function findTextRangesInDoc(
   });
 
   return ranges;
+}
+
+/**
+ * Swap the entire document without polluting the undo/redo stack.
+ * Use for chapter navigation and other workspace-level document loads.
+ */
+export function loadDocumentWithoutHistory(
+  editor: Editor,
+  html: string,
+): boolean {
+  const content = normalizeDraftContent(html);
+  const document = createDocument(content, editor.schema, {}, {
+    errorOnInvalidContent: false,
+  });
+
+  const { state, view } = editor;
+  if (view.isDestroyed) return false;
+
+  const transaction = state.tr
+    .replaceWith(0, state.doc.content.size, document)
+    .setMeta("addToHistory", false);
+
+  view.dispatch(transaction);
+  return true;
 }
 
 /** Replace verbatim text via TipTap transaction (preserves undo/redo history). */

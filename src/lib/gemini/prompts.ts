@@ -183,14 +183,35 @@ export function buildCustomRewritePrompt(input: {
   targetText: string;
   customPrompt: string;
   characterContext: string;
+  sceneBeat?: string;
+  plotObjectives?: string;
+  chapterAct?: string;
+  chapterTitle?: string;
+  settingNotes?: string;
 }): string {
-  const characterBlock = input.characterContext.trim()
-    ? `Character / story bible context:\n${input.characterContext}\n\n`
+  const codexLines = [
+    input.chapterAct && input.chapterTitle
+      ? `Active act/chapter: ${input.chapterAct} — ${input.chapterTitle}`
+      : null,
+    input.plotObjectives?.trim()
+      ? `Plot objectives: ${input.plotObjectives.trim()}`
+      : null,
+    input.sceneBeat?.trim() ? `Scene beat: ${input.sceneBeat.trim()}` : null,
+    input.settingNotes?.trim()
+      ? `Setting & lore: ${input.settingNotes.trim()}`
+      : null,
+    input.characterContext.trim()
+      ? `Smart Codex:\n${input.characterContext.trim()}`
+      : null,
+  ].filter(Boolean);
+
+  const codexBlock = codexLines.length
+    ? `${codexLines.join("\n")}\n\n`
     : "";
 
   return `You are a literary line editor in Soul Writer. Rewrite ONE passage to match the author's custom tone directive.
 
-${characterBlock}Original passage:
+${codexBlock}Original passage:
 ---
 ${input.targetText}
 ---

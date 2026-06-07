@@ -8,6 +8,11 @@ export async function POST(request: Request) {
     const targetText = String(body.targetText ?? "").trim();
     const customPrompt = String(body.customPrompt ?? "").trim();
     const characterContext = String(body.characterContext ?? "").trim();
+    const sceneBeat = String(body.sceneBeat ?? "").trim();
+    const plotObjectives = String(body.plotObjectives ?? "").trim();
+    const chapterAct = String(body.chapterAct ?? "").trim();
+    const chapterTitle = String(body.chapterTitle ?? "").trim();
+    const settingNotes = String(body.settingNotes ?? "").trim();
 
     if (!targetText || !customPrompt) {
       return NextResponse.json(
@@ -20,6 +25,11 @@ export async function POST(request: Request) {
       targetText,
       customPrompt,
       characterContext,
+      sceneBeat,
+      plotObjectives,
+      chapterAct,
+      chapterTitle,
+      settingNotes,
     });
 
     const raw = await generatePlainTextWithGemini(prompt);

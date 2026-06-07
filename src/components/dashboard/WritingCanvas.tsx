@@ -26,6 +26,7 @@ export function WritingCanvas() {
   const {
     story,
     activeChapter,
+    activeChapterId,
     draft,
     beat,
     sliderValue,
@@ -116,6 +117,7 @@ export function WritingCanvas() {
             value={beat}
             onChange={(event) => setBeat(event.target.value)}
             placeholder="Scene beat (optional)"
+            title="Active scene beat — synced from Plot Trajectory beats in the Story Bible and sent to AI prompts"
             className="min-w-[220px] flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm outline-none focus:border-amber-400"
           />
         </div>
@@ -124,6 +126,7 @@ export function WritingCanvas() {
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-5">
         <TipTapEditor
           onEditorReady={registerEditor}
+          documentKey={activeChapterId}
           content={draft}
           onUpdate={updateDraft}
           soulCheckInsights={soulCheckInsights}
