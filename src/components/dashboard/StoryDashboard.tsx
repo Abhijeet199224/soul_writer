@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Character, Story, StoryWorkspace } from "@/lib/types";
 import {
   StoryEngineProvider,
   useStoryEngine,
 } from "@/context/StoryEngineContext";
+import { StoryDeleteModal } from "@/components/stories/StoryDeleteModal";
+import { clearStoryLocalData } from "@/lib/story-local-data";
 import { NavigatorPanel } from "./NavigatorPanel";
 import { WritingCanvas } from "./WritingCanvas";
 import { AiHubPanel } from "./AiHubPanel";
@@ -24,6 +27,10 @@ interface StoryDashboardProps {
 
 function StoryDashboardShell() {
   const engine = useStoryEngine();
+  const router = useRouter();
+  const [showStoryDelete, setShowStoryDelete] = useState(false);
+  const [deletingStory, setDeletingStory] = useState(false);
+  const [storyDeleteError, setStoryDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -45,24 +52,70 @@ function StoryDashboardShell() {
       )
     : null;
 
+  async function confirmStoryDelete() {
+    setDeletingStory(true);
+    setStoryDeleteError(null);
+
+    try {
+      const response = await fetch("/api/stories/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storyId: engine.story.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to delete story");
+      }
+
+      clearStoryLocalData(engine.story.id);
+      router.push("/dashboard");
+      router.refresh();
+    } catch (error) {
+      setStoryDeleteError(
+        error instanceof Error ? error.message : "Failed to delete story",
+      );
+    } finally {
+      setDeletingStory(false);
+    }
+  }
+
   return (
     <div className="flex h-[calc(100dvh-57px)] flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-stone-200 bg-white/80 px-4 py-2 text-xs text-stone-500">
         <Link href="/dashboard" className="hover:text-stone-800">
           ← Stories
         </Link>
-        <span>
-          Soul Writer
-          {engine.activeChapter && (
-            <span className="ml-2 text-amber-800">
-              · {engine.activeChapter.act}
-            </span>
-          )}
-          {engine.focusMode && (
-            <span className="ml-2 text-amber-700">· Focus mode</span>
-          )}
-        </span>
+        <div className="flex items-center gap-3">
+          <span>
+            Soul Writer
+            {engine.activeChapter && (
+              <span className="ml-2 text-amber-800">
+                · {engine.activeChapter.act}
+              </span>
+            )}
+            {engine.focusMode && (
+              <span className="ml-2 text-amber-700">· Focus mode</span>
+            )}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setStoryDeleteError(null);
+              setShowStoryDelete(true);
+            }}
+            className="rounded-md px-2 py-1 text-red-600 hover:bg-red-50"
+            title={`Delete ${engine.story.title}`}
+          >
+            Delete story
+          </button>
+        </div>
       </div>
+
+      {storyDeleteError && (
+        <p className="border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">
+          {storyDeleteError}
+        </p>
+      )}
 
       {engine.cascadePrompt && (
         <CharacterCascadeModal
@@ -103,6 +156,17 @@ function StoryDashboardShell() {
           loading={engine.deleteChapterLoading}
           onConfirm={engine.confirmChapterDelete}
           onDismiss={engine.dismissChapterDelete}
+        />
+      )}
+
+      {showStoryDelete && (
+        <StoryDeleteModal
+          storyTitle={engine.story.title}
+          loading={deletingStory}
+          onConfirm={confirmStoryDelete}
+          onDismiss={() => {
+            if (!deletingStory) setShowStoryDelete(false);
+          }}
         />
       )}
 
