@@ -1,26 +1,35 @@
 "use client";
 
+import { useEffect } from "react";
 import type { Character } from "@/lib/types";
 
 interface CharacterHoverCardProps {
   character: Character;
   anchorRect: DOMRect;
+  onClose?: () => void;
 }
 
 export function CharacterHoverCard({
   character,
   anchorRect,
+  onClose,
 }: CharacterHoverCardProps) {
-  const top = anchorRect.bottom + window.scrollY + 8;
-  const left = Math.min(
-    anchorRect.left + window.scrollX,
-    window.innerWidth - 320,
-  );
+  const top = anchorRect.bottom + 8;
+  const left = Math.min(anchorRect.left, window.innerWidth - 288);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose?.();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
 
   return (
     <div
-      className="pointer-events-none fixed z-50 w-72 rounded-2xl border border-amber-200 bg-white p-4 shadow-xl shadow-amber-900/10"
+      className="character-codex-popover fixed z-50 w-72 rounded-2xl border border-amber-200 bg-white p-4 shadow-xl shadow-amber-900/10"
       style={{ top, left }}
+      onMouseLeave={() => onClose?.()}
     >
       <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
         Smart Codex

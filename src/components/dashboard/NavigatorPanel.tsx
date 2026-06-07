@@ -22,6 +22,7 @@ export function NavigatorPanel() {
     activeChapterId,
     switchChapter,
     selectPlotBeat,
+    chaptersLoaded,
     characters,
     handleCharacterSaved,
     setCharacters,
@@ -38,7 +39,7 @@ export function NavigatorPanel() {
 
   if (navigatorCollapsed) {
     return (
-      <aside className="flex w-12 shrink-0 flex-col items-center border-r border-stone-200 bg-white py-4 transition-all duration-300 ease-in-out">
+      <aside className="flex w-12 shrink-0 flex-col items-center overflow-hidden border-r border-stone-200 bg-white py-4 transition-all duration-300 ease-in-out">
         <button
           type="button"
           onClick={() => setNavigatorCollapsed(false)}
@@ -66,7 +67,7 @@ export function NavigatorPanel() {
   }
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-r border-stone-200 bg-white transition-all duration-300 ease-in-out xl:w-80">
+    <aside className="flex w-72 shrink-0 flex-col overflow-hidden border-r border-stone-200 bg-white transition-all duration-300 ease-in-out xl:w-80">
       <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-700">
           Story Bible
@@ -110,7 +111,21 @@ export function NavigatorPanel() {
             <p className="text-xs text-stone-500">
               Each Act is a chapter workspace. Select one to edit its manuscript.
             </p>
-            {chapters.map((chapter) => {
+            {!chaptersLoaded ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((key) => (
+                  <div
+                    key={key}
+                    className="animate-pulse rounded-xl border border-stone-200 bg-stone-50 p-3"
+                  >
+                    <div className="h-2 w-16 rounded bg-stone-200" />
+                    <div className="mt-2 h-4 w-3/4 rounded bg-stone-100" />
+                    <div className="mt-2 h-3 w-full rounded bg-stone-100" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              chapters.map((chapter) => {
               const isActive = chapter.id === activeChapterId;
               return (
                 <div
@@ -171,9 +186,10 @@ export function NavigatorPanel() {
                   )}
                 </div>
               );
-            })}
+            })
+            )}
 
-            {activeChapterId && (
+            {chaptersLoaded && activeChapterId && (
               <div className="rounded-xl border border-dashed border-stone-200 p-3">
                 <label className="text-[10px] font-semibold uppercase tracking-wide text-stone-400">
                   Chapter objectives

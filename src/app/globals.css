@@ -85,6 +85,18 @@ body {
   box-shadow: 0 0 0 2px rgb(99 102 241 / 0.45);
 }
 
+.tiptap-manuscript .character-codex-mark {
+  border-bottom: 2px solid rgb(217 119 6 / 0.55);
+  text-decoration: none;
+  cursor: help;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.tiptap-manuscript .character-codex-mark:hover {
+  background-color: rgb(251 191 36 / 0.14);
+  border-bottom-color: rgb(180 83 9 / 0.75);
+}
+
 @keyframes soul-pulse-amber {
   0%,
   100% {

@@ -31,6 +31,43 @@ export function findTextRangesInDoc(
   return ranges;
 }
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Case-insensitive whole-word matches in the document. */
+export function findWordRangesInDoc(
+  doc: Editor["state"]["doc"],
+  word: string,
+): { from: number; to: number }[] {
+  const needle = word.trim();
+  if (!needle) return [];
+
+  const pattern = new RegExp(`\\b${escapeRegex(needle)}\\b`, "gi");
+  const ranges: { from: number; to: number }[] = [];
+
+  doc.descendants((node, pos) => {
+    if (!node.isText || !node.text) return;
+    pattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(node.text)) !== null) {
+      ranges.push({
+        from: pos + match.index,
+        to: pos + match.index + match[0].length,
+      });
+    }
+  });
+
+  return ranges;
+}
+
+export function documentContainsText(
+  editor: Editor,
+  searchText: string,
+): boolean {
+  return findTextRangesInDoc(editor.state.doc, searchText.trim()).length > 0;
+}
+
 /**
  * Swap the entire document without polluting the undo/redo stack.
  * Use for chapter navigation and other workspace-level document loads.
@@ -72,6 +109,43 @@ export function replaceTextInEditor(
     .chain()
     .focus()
     .insertContentAt({ from, to }, replacement.trim())
+    .run();
+}
+
+/** Replace every whole-word match in one undoable transaction. */
+export function replaceAllWordsInEditor(
+  editor: Editor,
+  searchWord: string,
+  replacement: string,
+): boolean {
+  const trimmed = replacement.trim();
+  if (!searchWord.trim() || !trimmed) return false;
+
+  const ranges = findWordRangesInDoc(editor.state.doc, searchWord);
+  if (!ranges.length) return false;
+
+  return editor
+    .chain()
+    .focus()
+    .command(({ tr, dispatch }) => {
+      const sorted = [...ranges].sort((a, b) => b.from - a.from);
+      for (const { from, to } of sorted) {
+        tr.insertText(trimmed, from, to);
+      }
+      if (dispatch) dispatch(tr);
+      return true;
+    })
+    .run();
+}
+
+/** Insert at the current selection/cursor via insertContentAt. */
+export function insertTextAtCursor(editor: Editor, text: string): boolean {
+  if (!text.trim()) return false;
+  const { from, to } = editor.state.selection;
+  return editor
+    .chain()
+    .focus()
+    .insertContentAt({ from, to }, text)
     .run();
 }
 

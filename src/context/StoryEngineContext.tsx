@@ -22,7 +22,6 @@ import { useDebouncedChapterSave } from "@/hooks/useDebouncedWorkspaceSave";
 import {
   countNameMentions,
   draftContainsName,
-  replaceNameInHtmlDraft,
 } from "@/lib/character-name-sync";
 import type {
   GhostwriteAiResult,
@@ -83,10 +82,12 @@ interface StoryEngineContextValue {
   soulCheckInsights: SoulCheckInsight[];
   linkedNames: string[];
   focusMode: boolean;
+  chaptersLoaded: boolean;
   renamePrompt: CharacterRenamePrompt | null;
   rewriteStates: Record<number, InsightRewriteState>;
   customRewriteLoading: number | null;
   registerEditor: (handle: TipTapEditorHandle | null) => void;
+  syncRewriteStatesFromDocument: () => void;
   setNavigatorCollapsed: (v: boolean | ((p: boolean) => boolean)) => void;
   setAiHubCollapsed: (v: boolean | ((p: boolean) => boolean)) => void;
   setAiTab: (tab: "soul-check" | "ghostwrite") => void;
@@ -338,6 +339,10 @@ export function StoryEngineProvider({
     (value: string) => {
       if (!activeChapter) return;
       updateChapterInState(activeChapter.id, { scene_beat: value });
+      const matchingBeat = activeChapter.plot_beats.find(
+        (plotBeat) => plotBeat.title === value,
+      );
+      setActivePlotBeatTitle(matchingBeat?.title ?? null);
     },
     [activeChapter, updateChapterInState],
   );
@@ -380,16 +385,46 @@ export function StoryEngineProvider({
   );
 
   const confirmRenameInDraft = useCallback(() => {
-    if (!renamePrompt || !activeChapter) return;
-    const updated = replaceNameInHtmlDraft(
-      activeChapter.draft_content,
+    if (!renamePrompt) return;
+    const editor = editorHandleRef.current;
+    if (!editor) return;
+
+    const ok = editor.replaceAllWords(
       renamePrompt.oldName,
       renamePrompt.newName,
     );
-    updateChapterInState(activeChapter.id, { draft_content: updated });
-    editorHandleRef.current?.loadDocument(updated);
+    if (!ok) return;
     setRenamePrompt(null);
-  }, [renamePrompt, activeChapter, updateChapterInState]);
+  }, [renamePrompt]);
+
+  const syncRewriteStatesFromDocument = useCallback(() => {
+    const editor = editorHandleRef.current;
+    if (!editor) return;
+
+    const prev = rewriteStatesRef.current;
+    const entries = Object.entries(prev);
+    if (!entries.length) return;
+
+    let changed = false;
+    const next: Record<number, InsightRewriteState> = { ...prev };
+
+    for (const [key, state] of entries) {
+      const index = Number(key);
+      const hasApplied = editor.documentContainsText(state.appliedText);
+      const hasOriginal = editor.documentContainsText(state.originalText);
+      let showingApplied = state.showingApplied;
+
+      if (hasApplied && !hasOriginal) showingApplied = true;
+      else if (hasOriginal && !hasApplied) showingApplied = false;
+
+      if (showingApplied !== state.showingApplied) {
+        next[index] = { ...state, showingApplied };
+        changed = true;
+      }
+    }
+
+    if (changed) setRewriteStates(next);
+  }, []);
 
   const dismissRenamePrompt = useCallback(() => setRenamePrompt(null), []);
 
@@ -593,6 +628,9 @@ export function StoryEngineProvider({
           sliderValue,
           beat,
           chapterId: activeChapterId,
+          plotObjectives: activeChapter?.plot_objectives ?? "",
+          activePlotBeatTitle: sessionContext?.activePlotBeatTitle ?? "",
+          settingNotes,
         }),
       });
       const data = await response.json();
@@ -610,7 +648,17 @@ export function StoryEngineProvider({
     } finally {
       setAiLoading(null);
     }
-  }, [story.id, plainDraft, sliderValue, beat, activeChapterId, clearRewriteStates]);
+  }, [
+    story.id,
+    plainDraft,
+    sliderValue,
+    beat,
+    activeChapterId,
+    activeChapter,
+    sessionContext,
+    settingNotes,
+    clearRewriteStates,
+  ]);
 
   const runGhostwrite = useCallback(async () => {
     setAiLoading("ghostwrite");
@@ -689,10 +737,12 @@ export function StoryEngineProvider({
     soulCheckInsights,
     linkedNames,
     focusMode,
+    chaptersLoaded,
     renamePrompt,
     rewriteStates,
     customRewriteLoading,
     registerEditor,
+    syncRewriteStatesFromDocument,
     setNavigatorCollapsed,
     setAiHubCollapsed,
     setAiTab,
