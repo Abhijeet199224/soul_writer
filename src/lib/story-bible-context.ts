@@ -24,7 +24,7 @@ export function parseOutlineJson(value: unknown): OutlineBeat[] {
     .map((item) => ({
       id: item.id,
       title: item.title,
-      act: typeof item.act === "string" ? item.act : "Act 2",
+      act: typeof item.act === "string" ? item.act : "Chapter 2",
     }));
 }
 
@@ -65,7 +65,7 @@ export function buildStoryBibleSystemBlock(
     "",
     "=== SETTING & LORE NOTES ===",
     formatSettingNotesContext(bible.settingNotes),
-    chapterLine ? `\n=== ACTIVE ACT/CHAPTER ===\n${chapterLine}` : null,
+    chapterLine ? `\n=== ACTIVE CHAPTER ===\n${chapterLine}` : null,
     sceneLine ? `\n=== ACTIVE SCENE ===\n${sceneLine}` : null,
   ]
     .filter(Boolean)

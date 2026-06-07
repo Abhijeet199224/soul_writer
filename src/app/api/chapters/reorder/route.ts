@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { normalizeChapter } from "@/lib/chapters";
+import { ensureSequentialChapterLabels } from "@/lib/chapter-renumber";
 
 export async function POST(request: Request) {
   try {
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     const swapIndex = direction === "up" ? index - 1 : index + 1;
     if (swapIndex < 0 || swapIndex >= ordered.length) {
       return NextResponse.json(
-        { error: "Cannot move this Act in that direction." },
+        { error: "Cannot move this chapter in that direction." },
         { status: 400 },
       );
     }
@@ -91,20 +91,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: neighborError.message }, { status: 500 });
     }
 
-    const { data: refreshed, error: refreshError } = await supabase
-      .from("story_chapters")
-      .select("*")
-      .eq("story_id", storyId)
-      .order("sequence");
-
-    if (refreshError) {
-      return NextResponse.json({ error: refreshError.message }, { status: 500 });
-    }
+    const renumberedChapters = await ensureSequentialChapterLabels(
+      supabase,
+      storyId,
+      { force: true },
+    );
 
     return NextResponse.json({
-      chapters: (refreshed ?? []).map((row) =>
-        normalizeChapter(row as Record<string, unknown>),
-      ),
+      chapters: renumberedChapters,
     });
   } catch (err) {
     console.error("POST /api/chapters/reorder:", err);

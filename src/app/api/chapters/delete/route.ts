@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { ensureSequentialChapterLabels } from "@/lib/chapter-renumber";
 
 export async function POST(request: Request) {
   try {
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
 
     if ((chapters ?? []).length <= 1) {
       return NextResponse.json(
-        { error: "Cannot delete the only remaining Act in this story." },
+        { error: "Cannot delete the only remaining chapter in this story." },
         { status: 400 },
       );
     }
@@ -66,8 +67,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: deleteError.message }, { status: 500 });
     }
 
-    const remaining = (chapters ?? []).filter((chapter) => chapter.id !== chapterId);
-    const fallbackId = remaining[0]?.id ?? null;
+    const remainingBeforeRenumber = (chapters ?? []).filter(
+      (chapter) => chapter.id !== chapterId,
+    );
+    const fallbackId = remainingBeforeRenumber[0]?.id ?? null;
 
     await supabase.from("story_workspace").upsert(
       {
@@ -78,10 +81,17 @@ export async function POST(request: Request) {
       { onConflict: "story_id" },
     );
 
+    const renumberedChapters = await ensureSequentialChapterLabels(
+      supabase,
+      storyId,
+      { force: true },
+    );
+
     return NextResponse.json({
       ok: true,
       activeChapterId: fallbackId,
       deletedChapterId: chapterId,
+      chapters: renumberedChapters,
     });
   } catch (err) {
     console.error("POST /api/chapters/delete:", err);

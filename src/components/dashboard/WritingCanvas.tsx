@@ -78,7 +78,7 @@ export function WritingCanvas() {
                   value={activeChapter.title}
                   onChange={(event) => setChapterTitle(event.target.value)}
                   placeholder="Chapter title…"
-                  title="Chapter title — auto-focused when you add a new Act"
+                  title="Chapter title — auto-focused when you add a new chapter"
                   className="mt-1 w-full truncate border-b border-transparent bg-transparent font-serif text-sm text-stone-700 outline-none transition placeholder:text-stone-400 focus:border-amber-300"
                 />
               </>

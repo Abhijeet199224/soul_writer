@@ -5,6 +5,7 @@ import {
   chapterTimestampsEqual,
   normalizeChapter,
 } from "@/lib/chapters";
+import { ensureSequentialChapterLabels } from "@/lib/chapter-renumber";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -81,6 +82,12 @@ export async function GET(request: Request) {
     }
   }
 
+  try {
+    chapters = await ensureSequentialChapterLabels(supabase, storyId);
+  } catch (renumberError) {
+    console.error("GET /api/chapters renumber:", renumberError);
+  }
+
   const { data: workspace } = await supabase
     .from("story_workspace")
     .select("active_chapter_id, setting_notes, slider_value")
@@ -117,7 +124,6 @@ export async function POST(request: Request) {
       plotObjectives,
       plotBeats,
       title,
-      act,
       activeChapterId,
       settingNotes,
       sliderValue,
@@ -129,7 +135,6 @@ export async function POST(request: Request) {
       plotObjectives?: string;
       plotBeats?: unknown;
       title?: string;
-      act?: string;
       activeChapterId?: string;
       settingNotes?: string;
       sliderValue?: number;
@@ -179,38 +184,6 @@ export async function POST(request: Request) {
         }
       }
 
-      if (act !== undefined) {
-        const trimmedAct = act.trim();
-        if (!trimmedAct) {
-          return NextResponse.json(
-            { error: "Act label cannot be empty." },
-            { status: 400 },
-          );
-        }
-
-        const { data: siblings, error: siblingsError } = await supabase
-          .from("story_chapters")
-          .select("id, act")
-          .eq("story_id", storyId)
-          .neq("id", chapterId);
-
-        if (siblingsError) {
-          return NextResponse.json({ error: siblingsError.message }, { status: 500 });
-        }
-
-        const duplicate = (siblings ?? []).some(
-          (row) => row.act.trim().toLowerCase() === trimmedAct.toLowerCase(),
-        );
-        if (duplicate) {
-          return NextResponse.json(
-            {
-              error: `An Act named "${trimmedAct}" already exists in this story.`,
-            },
-            { status: 409 },
-          );
-        }
-      }
-
       const chapterRow: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
       };
@@ -219,7 +192,6 @@ export async function POST(request: Request) {
       if (plotObjectives !== undefined) chapterRow.plot_objectives = plotObjectives;
       if (plotBeats !== undefined) chapterRow.plot_beats = plotBeats;
       if (title !== undefined) chapterRow.title = title;
-      if (act !== undefined) chapterRow.act = act.trim();
 
       const { data: updatedChapter, error: chapterError } = await supabase
         .from("story_chapters")
@@ -230,14 +202,6 @@ export async function POST(request: Request) {
         .single();
 
       if (chapterError) {
-        if (chapterError.code === "23505") {
-          return NextResponse.json(
-            {
-              error: `An Act named "${String(act).trim()}" already exists in this story.`,
-            },
-            { status: 409 },
-          );
-        }
         return NextResponse.json({ error: chapterError.message }, { status: 500 });
       }
 

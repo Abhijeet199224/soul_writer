@@ -1,20 +1,18 @@
 "use client";
 
-interface ChapterDeleteModalProps {
-  actLabel: string;
-  chapterTitle: string;
+interface StoryDeleteModalProps {
+  storyTitle: string;
   loading?: boolean;
   onConfirm: () => void | Promise<void>;
   onDismiss: () => void;
 }
 
-export function ChapterDeleteModal({
-  actLabel,
-  chapterTitle,
+export function StoryDeleteModal({
+  storyTitle,
   loading = false,
   onConfirm,
   onDismiss,
-}: ChapterDeleteModalProps) {
+}: StoryDeleteModalProps) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/45 p-4 backdrop-blur-[2px]">
       <div
@@ -23,16 +21,14 @@ export function ChapterDeleteModal({
         className="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-6 shadow-2xl"
       >
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">
-          Delete chapter
+          Delete story
         </p>
         <h2 className="mt-2 font-serif text-xl text-stone-900">
-          Delete {actLabel}?
+          Delete &ldquo;{storyTitle}&rdquo;?
         </h2>
         <p className="mt-3 text-sm text-stone-600">
-          This permanently removes{" "}
-          <strong>{chapterTitle || "this chapter workspace"}</strong> and its
-          manuscript draft. Remaining chapters will be renumbered automatically.
-          You must keep at least one chapter in the story.
+          This permanently removes the story, all chapters, characters, and
+          manuscript drafts. This cannot be undone.
         </p>
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button
@@ -49,7 +45,7 @@ export function ChapterDeleteModal({
             disabled={loading}
             className="rounded-xl bg-rose-700 px-4 py-2 text-sm font-medium text-white hover:bg-rose-800 disabled:opacity-60"
           >
-            {loading ? "Deleting…" : "Delete chapter"}
+            {loading ? "Deleting…" : "Delete story"}
           </button>
         </div>
       </div>

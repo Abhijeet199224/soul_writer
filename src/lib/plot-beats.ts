@@ -1,6 +1,6 @@
 import type { PlotBeat } from "@/lib/types";
 
-export const DEFAULT_NEW_ACT_PLOT_BEATS: PlotBeat[] = [
+export const DEFAULT_NEW_CHAPTER_PLOT_BEATS: PlotBeat[] = [
   { id: "beat-opening", title: "Opening beat" },
   { id: "beat-development", title: "Development beat" },
   { id: "beat-turn", title: "Turning point" },

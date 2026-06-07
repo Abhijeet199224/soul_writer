@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { normalizeChapter } from "@/lib/chapters";
-import { DEFAULT_NEW_ACT_PLOT_BEATS } from "@/lib/plot-beats";
+import { normalizeChapter, formatChapterLabel } from "@/lib/chapters";
+import { DEFAULT_NEW_CHAPTER_PLOT_BEATS } from "@/lib/plot-beats";
 
 export async function POST(request: Request) {
   try {
@@ -44,11 +44,11 @@ export async function POST(request: Request) {
       -1,
     );
 
-    let actNumber = (existing?.length ?? 0) + 1;
-    let act = `Act ${actNumber}`;
+    let chapterNumber = (existing?.length ?? 0) + 1;
+    let act = formatChapterLabel(chapterNumber);
     while (acts.has(act)) {
-      actNumber += 1;
-      act = `Act ${actNumber}`;
+      chapterNumber += 1;
+      act = formatChapterLabel(chapterNumber);
     }
 
     const sequence = maxSequence + 1;
@@ -60,9 +60,9 @@ export async function POST(request: Request) {
         act,
         title: "",
         sequence,
-        plot_beats: DEFAULT_NEW_ACT_PLOT_BEATS,
+        plot_beats: DEFAULT_NEW_CHAPTER_PLOT_BEATS,
         plot_objectives:
-          "Define what this Act must accomplish before the story moves forward.",
+          "Define what this chapter must accomplish before the story moves forward.",
         scene_beat: "",
         draft_content: "<p></p>",
       })

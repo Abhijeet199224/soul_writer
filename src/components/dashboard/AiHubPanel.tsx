@@ -279,9 +279,16 @@ export function AiHubPanel() {
     engine.aiTab === "soul-check"
       ? engine.soulCheckResult
       : engine.ghostwriteResult;
+  const isChapterSoulCheckLoading =
+    engine.aiTab === "soul-check" && engine.aiLoading === "soul-check";
+  const isSelectionSoulCheckLoading =
+    engine.aiTab === "soul-check" && engine.selectionLoading;
+  const isGhostwriteLoading =
+    engine.aiTab === "ghostwrite" && engine.aiLoading === "ghostwrite";
   const isLoading =
-    engine.aiLoading === engine.aiTab ||
-    (engine.aiTab === "soul-check" && engine.selectionLoading);
+    isChapterSoulCheckLoading ||
+    isSelectionSoulCheckLoading ||
+    isGhostwriteLoading;
   const isBusy = engine.aiLoading !== null || engine.selectionLoading;
 
   useEffect(() => {
@@ -418,7 +425,13 @@ export function AiHubPanel() {
           <div>
             <div className="mb-3 flex items-center gap-2 text-xs text-amber-800">
               <Sparkles className="h-3.5 w-3.5 animate-pulse" />
-              <span>Gemini is reading your chapter…</span>
+              <span>
+                {isSelectionSoulCheckLoading
+                  ? "Gemini is analyzing your selection…"
+                  : isChapterSoulCheckLoading
+                    ? "Gemini is reading your chapter…"
+                    : "Gemini is drafting…"}
+              </span>
             </div>
             <InsightSkeleton />
           </div>

@@ -42,7 +42,7 @@ Complete or extend ONLY the author's current sentence at the cursor. Output a sh
 Match the author's voice exactly. Do not draft new paragraphs.`;
   }
   return `GHOSTWRITER TIER: FULL GHOSTWRITER (${sliderValue}/100, 71–100%).
-Draft the next 200–300 words advancing the current Act/Chapter plot objectives.
+Draft the next 200–300 words advancing the current chapter plot objectives.
 Bold creative choices grounded in the Story Bible and chapter sequence.`;
 }
 
@@ -50,7 +50,7 @@ export function buildSystemPrompt(ctx: PromptContext, mode: AiMode): string {
   const proseSample = ctx.selectedText ?? ctx.draftContent;
   const bibleBlock = buildStoryBibleSystemBlock(ctx.bible, proseSample);
   const chapterBlock = ctx.chapter
-    ? `\n=== ACTIVE ACT/CHAPTER ===\n${formatChapterContext(ctx.chapter)}`
+    ? `\n=== ACTIVE CHAPTER ===\n${formatChapterContext(ctx.chapter)}`
     : "";
   const sliderGuidance = soulCheckSliderGuidance(ctx.sliderValue);
 
@@ -191,7 +191,7 @@ export function buildCustomRewritePrompt(input: {
 }): string {
   const codexLines = [
     input.chapterAct && input.chapterTitle
-      ? `Active act/chapter: ${input.chapterAct} — ${input.chapterTitle}`
+      ? `Active chapter: ${input.chapterAct} — ${input.chapterTitle}`
       : null,
     input.plotObjectives?.trim()
       ? `Plot objectives: ${input.plotObjectives.trim()}`

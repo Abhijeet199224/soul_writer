@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { CreateStoryForm } from "@/components/stories/CreateStoryForm";
+import { StoryLibrary } from "@/components/stories/StoryLibrary";
 import { createClient } from "@/lib/supabase/server";
 import type { Story } from "@/lib/types";
 
@@ -42,35 +42,7 @@ export default async function DashboardPage() {
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-stone-500">
               Library
             </h2>
-            {(stories as Story[] | null)?.length ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {(stories as Story[]).map((story) => (
-                  <Link
-                    key={story.id}
-                    href={`/stories/${story.id}`}
-                    className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition hover:border-amber-300 hover:shadow-md"
-                  >
-                    <h3 className="font-serif text-xl text-stone-900">
-                      {story.title}
-                    </h3>
-                    {story.synopsis && (
-                      <p className="mt-2 line-clamp-2 text-sm text-stone-600">
-                        {story.synopsis}
-                      </p>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-stone-300 bg-white/60 p-10 text-center">
-                <p className="font-serif text-lg text-stone-700">
-                  No stories yet
-                </p>
-                <p className="mt-2 text-sm text-stone-500">
-                  Create your first project to start building character profiles.
-                </p>
-              </div>
-            )}
+            <StoryLibrary stories={(stories as Story[]) ?? []} />
           </section>
         </div>
       </main>

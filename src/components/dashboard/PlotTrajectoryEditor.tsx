@@ -38,7 +38,7 @@ export function PlotTrajectoryEditor({
 
       {beats.length === 0 ? (
         <p className="text-[11px] text-stone-500">
-          No beats yet. Add beats to map this Act&apos;s trajectory.
+          No beats yet. Add beats to map this chapter&apos;s trajectory.
         </p>
       ) : (
         <ul className="space-y-1">
