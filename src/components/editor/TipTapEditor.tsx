@@ -21,10 +21,16 @@ import {
   getInsightIndexAtPos,
   syncActiveInsightHighlight,
 } from "@/lib/soul-check-highlights";
+import {
+  appendParagraphInEditor,
+  replaceTextInEditor,
+} from "@/lib/editor-transactions";
 
 export interface TipTapEditorHandle {
   getCursorPrefix: () => string;
   insertAtCursor: (text: string) => void;
+  replaceTargetText: (searchText: string, replacement: string) => boolean;
+  appendParagraph: (prose: string) => boolean;
 }
 
 interface TipTapEditorProps {
@@ -128,6 +134,10 @@ export function TipTapEditor({
           if (!text.trim()) return;
           editor.chain().focus().insertContent(text).run();
         },
+        replaceTargetText: (searchText: string, replacement: string) =>
+          replaceTextInEditor(editor, searchText, replacement),
+        appendParagraph: (prose: string) =>
+          appendParagraphInEditor(editor, prose),
       });
       return () => onEditorReady(null);
     }, [editor, onEditorReady]);
@@ -252,7 +262,7 @@ export function TipTapEditor({
             <>
               <span className="mx-1 h-5 w-px bg-stone-600" />
               <MenuButton
-                title="Run Soul Check"
+                title="Run Soul Check on selected text — audits voice and suggests tone rewrites in the AI Hub"
                 onClick={runSoulCheckOnSelection}
               >
                 <Sparkles

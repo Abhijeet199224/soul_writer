@@ -15,9 +15,7 @@ import type { GhostwriteResult, SoulCheckInsight } from "@/lib/gemini/generate";
 import { getGhostwriteTier } from "@/lib/chapters";
 import {
   htmlToPlainText,
-  insertPlainTextAtEnd,
   normalizeDraftContent,
-  replaceTargetTextInHtml,
 } from "@/lib/draft-content";
 import { useStoryBibleIndex } from "@/hooks/useStoryBibleIndex";
 import { useDebouncedChapterSave } from "@/hooks/useDebouncedWorkspaceSave";
@@ -45,6 +43,13 @@ interface CharacterRenamePrompt {
   mentionCount: number;
 }
 
+export interface InsightRewriteState {
+  originalText: string;
+  appliedText: string;
+  showingApplied: boolean;
+  label: string;
+}
+
 interface StoryEngineContextValue {
   story: Story;
   characters: Character[];
@@ -69,6 +74,8 @@ interface StoryEngineContextValue {
   linkedNames: string[];
   focusMode: boolean;
   renamePrompt: CharacterRenamePrompt | null;
+  rewriteStates: Record<number, InsightRewriteState>;
+  customRewriteLoading: number | null;
   registerEditor: (handle: TipTapEditorHandle | null) => void;
   setNavigatorCollapsed: (v: boolean | ((p: boolean) => boolean)) => void;
   setAiHubCollapsed: (v: boolean | ((p: boolean) => boolean)) => void;
@@ -86,7 +93,18 @@ interface StoryEngineContextValue {
   runSelectionSoulCheck: (selectedText: string) => Promise<void>;
   runSoulCheck: () => Promise<void>;
   runGhostwrite: () => Promise<void>;
-  applyToneRewrite: (targetText: string, replacement: string) => void;
+  applyPresetRewrite: (
+    insightIndex: number,
+    targetText: string,
+    replacement: string,
+    label: string,
+  ) => void;
+  runCustomRewrite: (
+    insightIndex: number,
+    targetText: string,
+    customPrompt: string,
+  ) => Promise<void>;
+  toggleRewrite: (insightIndex: number) => void;
   setActiveInsightIndex: (index: number | null) => void;
   onHighlightInsight: (index: number) => void;
 }
@@ -143,6 +161,19 @@ export function StoryEngineProvider({
   );
   const [renamePrompt, setRenamePrompt] =
     useState<CharacterRenamePrompt | null>(null);
+  const [rewriteStates, setRewriteStates] = useState<
+    Record<number, InsightRewriteState>
+  >({});
+  const [customRewriteLoading, setCustomRewriteLoading] = useState<number | null>(
+    null,
+  );
+
+  const clearRewriteStates = useCallback(() => setRewriteStates({}), []);
+  const rewriteStatesRef = useRef(rewriteStates);
+
+  useEffect(() => {
+    rewriteStatesRef.current = rewriteStates;
+  }, [rewriteStates]);
 
   const activeChapter = useMemo(
     () => chapters.find((c) => c.id === activeChapterId) ?? chapters[0] ?? null,
@@ -238,8 +269,9 @@ export function StoryEngineProvider({
       if (chapterId === activeChapterId) return;
       setActiveChapterId(chapterId);
       setActiveInsightIndex(null);
+      clearRewriteStates();
     },
-    [activeChapterId],
+    [activeChapterId, clearRewriteStates],
   );
 
   const updateDraft = useCallback(
@@ -310,18 +342,112 @@ export function StoryEngineProvider({
 
   const dismissRenamePrompt = useCallback(() => setRenamePrompt(null), []);
 
-  const applyToneRewrite = useCallback(
-    (targetText: string, replacement: string) => {
-      if (!activeChapter) return;
-      const updated = replaceTargetTextInHtml(
-        activeChapter.draft_content,
-        targetText,
-        replacement,
-      );
-      updateChapterInState(activeChapter.id, { draft_content: updated });
-      setActiveInsightIndex(null);
+  const applyPresetRewrite = useCallback(
+    (
+      insightIndex: number,
+      targetText: string,
+      replacement: string,
+      label: string,
+    ) => {
+      const editor = editorHandleRef.current;
+      const trimmed = replacement.trim();
+      if (!editor || !trimmed) return;
+
+      const prev = rewriteStatesRef.current;
+      const existing = prev[insightIndex];
+      const originalText = existing?.originalText ?? targetText.trim();
+      const searchText =
+        existing && !existing.showingApplied
+          ? originalText
+          : (existing?.appliedText ?? targetText.trim());
+
+      let ok = editor.replaceTargetText(searchText, trimmed);
+      if (!ok) {
+        ok = editor.replaceTargetText(targetText.trim(), trimmed);
+        if (!ok) return;
+      }
+
+      setRewriteStates({
+        ...prev,
+        [insightIndex]: {
+          originalText,
+          appliedText: trimmed,
+          showingApplied: true,
+          label,
+        },
+      });
+      setActiveInsightIndex(insightIndex);
     },
-    [activeChapter, updateChapterInState],
+    [],
+  );
+
+  const toggleRewrite = useCallback((insightIndex: number) => {
+    const editor = editorHandleRef.current;
+    if (!editor) return;
+
+    const state = rewriteStatesRef.current[insightIndex];
+    if (!state) return;
+
+    const searchText = state.showingApplied
+      ? state.appliedText
+      : state.originalText;
+    const replacement = state.showingApplied
+      ? state.originalText
+      : state.appliedText;
+
+    const ok = editor.replaceTargetText(searchText, replacement);
+    if (!ok) return;
+
+    setRewriteStates({
+      ...rewriteStatesRef.current,
+      [insightIndex]: {
+        ...state,
+        showingApplied: !state.showingApplied,
+      },
+    });
+  }, []);
+
+  const runCustomRewrite = useCallback(
+    async (insightIndex: number, targetText: string, customPrompt: string) => {
+      const trimmedPrompt = customPrompt.trim();
+      if (!trimmedPrompt) return;
+
+      setCustomRewriteLoading(insightIndex);
+      setAiError(null);
+
+      try {
+        const characterContext = linkedNames.join(", ");
+        const response = await fetch("/api/custom-rewrite", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            targetText,
+            customPrompt: trimmedPrompt,
+            characterContext,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error ?? "Custom rewrite failed");
+        }
+
+        applyPresetRewrite(
+          insightIndex,
+          targetText,
+          data.rewrite as string,
+          trimmedPrompt.length > 40
+            ? `${trimmedPrompt.slice(0, 40)}…`
+            : trimmedPrompt,
+        );
+      } catch (error) {
+        setAiError(
+          error instanceof Error ? error.message : "Custom rewrite failed",
+        );
+      } finally {
+        setCustomRewriteLoading(null);
+      }
+    },
+    [linkedNames, applyPresetRewrite],
   );
 
   const onHighlightInsight = useCallback((index: number) => {
@@ -337,6 +463,7 @@ export function StoryEngineProvider({
       setAiTab("soul-check");
       setAiHubCollapsed(false);
       setActiveInsightIndex(null);
+      clearRewriteStates();
 
       try {
         const response = await fetch("/api/soul-check", {
@@ -365,7 +492,7 @@ export function StoryEngineProvider({
         setSelectionLoading(false);
       }
     },
-    [story.id, sliderValue, activeChapterId],
+    [story.id, sliderValue, activeChapterId, clearRewriteStates],
   );
 
   const runSoulCheck = useCallback(async () => {
@@ -374,6 +501,7 @@ export function StoryEngineProvider({
     setAiTab("soul-check");
     setAiHubCollapsed(false);
     setActiveInsightIndex(null);
+    clearRewriteStates();
 
     try {
       const response = await fetch("/api/ai", {
@@ -403,7 +531,7 @@ export function StoryEngineProvider({
     } finally {
       setAiLoading(null);
     }
-  }, [story.id, plainDraft, sliderValue, beat, activeChapterId]);
+  }, [story.id, plainDraft, sliderValue, beat, activeChapterId, clearRewriteStates]);
 
   const runGhostwrite = useCallback(async () => {
     setAiLoading("ghostwrite");
@@ -442,10 +570,8 @@ export function StoryEngineProvider({
 
       if (tier === "copilot" && result.prose) {
         editorHandleRef.current?.insertAtCursor(result.prose);
-      } else if (tier === "ghostwriter" && result.prose && activeChapter) {
-        updateChapterInState(activeChapter.id, {
-          draft_content: insertPlainTextAtEnd(draft, result.prose),
-        });
+      } else if (tier === "ghostwriter" && result.prose) {
+        editorHandleRef.current?.appendParagraph(result.prose);
       }
     } catch (error) {
       setAiError(error instanceof Error ? error.message : "Ghostwrite failed");
@@ -458,9 +584,6 @@ export function StoryEngineProvider({
     sliderValue,
     beat,
     activeChapterId,
-    activeChapter,
-    draft,
-    updateChapterInState,
   ]);
 
   const value: StoryEngineContextValue = {
@@ -487,6 +610,8 @@ export function StoryEngineProvider({
     linkedNames,
     focusMode,
     renamePrompt,
+    rewriteStates,
+    customRewriteLoading,
     registerEditor,
     setNavigatorCollapsed,
     setAiHubCollapsed,
@@ -504,7 +629,9 @@ export function StoryEngineProvider({
     runSelectionSoulCheck,
     runSoulCheck,
     runGhostwrite,
-    applyToneRewrite,
+    applyPresetRewrite,
+    runCustomRewrite,
+    toggleRewrite,
     setActiveInsightIndex,
     onHighlightInsight,
   };

@@ -65,7 +65,7 @@ function StoryDashboardShell() {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out">
         <NavigatorPanel />
         <WritingCanvas />
         <AiHubPanel />
