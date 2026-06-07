@@ -178,3 +178,29 @@ Current chapter draft:
 ${ctx.draftContent.slice(-6000)}
 ---`;
 }
+
+export function buildCustomRewritePrompt(input: {
+  targetText: string;
+  customPrompt: string;
+  characterContext: string;
+}): string {
+  const characterBlock = input.characterContext.trim()
+    ? `Character / story bible context:\n${input.characterContext}\n\n`
+    : "";
+
+  return `You are a literary line editor in Soul Writer. Rewrite ONE passage to match the author's custom tone directive.
+
+${characterBlock}Original passage:
+---
+${input.targetText}
+---
+
+Custom tone directive:
+"${input.customPrompt}"
+
+Rules:
+- Return ONLY the rewritten passage — no quotes, labels, or explanation.
+- Preserve narrative POV, tense, and continuity with surrounding prose.
+- Match the requested tone precisely while keeping the same story beat.
+- One paragraph maximum unless the original was multiple sentences that must stay grouped.`;
+}

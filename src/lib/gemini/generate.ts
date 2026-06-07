@@ -158,3 +158,54 @@ export async function generateWithGemini(
 
   throw lastError ?? new Error("Gemini generation failed");
 }
+
+/** Single-shot plain-text generation with the same model fallback chain. */
+export async function generatePlainTextWithGemini(
+  prompt: string,
+  options?: { temperature?: number; maxOutputTokens?: number },
+): Promise<string> {
+  const genAI = getClient();
+  const modelChain = resolveModelChain();
+  let lastError: Error | null = null;
+
+  for (let index = 0; index < modelChain.length; index++) {
+    const modelName = modelChain[index];
+
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          temperature: options?.temperature ?? 0.85,
+          maxOutputTokens: options?.maxOutputTokens ?? 512,
+        },
+      });
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+
+      if (!text?.trim()) {
+        throw new Error("Gemini returned an empty response");
+      }
+
+      if (index > 0) {
+        console.warn(`[Gemini] Recovered using fallback model: ${modelName}`);
+      }
+
+      return text;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      const hasFallback = index < modelChain.length - 1;
+
+      if (isRetryableGeminiError(err) && hasFallback) {
+        console.warn(
+          `[Gemini] ${modelName} failed (${lastError.message}). Trying ${modelChain[index + 1]}…`,
+        );
+        continue;
+      }
+
+      throw lastError;
+    }
+  }
+
+  throw lastError ?? new Error("Gemini generation failed");
+}

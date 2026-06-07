@@ -75,9 +75,15 @@ export function WritingCanvas() {
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          <div className="min-w-[200px] flex-1">
+          <div
+            className="min-w-[200px] flex-1"
+            title="Controls how much AI writes on the canvas: 0–30% ideas only, 31–70% completes your sentence, 71–100% drafts new paragraphs"
+          >
             <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="font-medium text-stone-600">
+              <span
+                className="font-medium text-stone-600"
+                title="Slide left for more human control, right for more AI ghostwriting"
+              >
                 Collaboration Slider
               </span>
               <span className="font-medium text-amber-800">
@@ -92,6 +98,8 @@ export function WritingCanvas() {
               onChange={(event) =>
                 setSliderValue(Number(event.target.value))
               }
+              title={`Collaboration level ${sliderValue}% — ${sliderLabel(sliderValue)}`}
+              aria-label="Collaboration slider"
               className="w-full accent-amber-700"
             />
             <p className="mt-1 text-[10px] text-stone-400">
