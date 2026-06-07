@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SaveStatus } from "@/lib/types";
+import type { PlotBeat } from "@/lib/types";
 
 const DRAFT_DEBOUNCE_MS = 1500;
 const LARGE_DRAFT_DEBOUNCE_MS = 3500;
@@ -13,7 +14,10 @@ export interface ChapterSaveSnapshot {
   chapterId: string;
   draftContent: string;
   sceneBeat: string;
+  title?: string;
+  act?: string;
   plotObjectives?: string;
+  plotBeats?: PlotBeat[];
   expectedUpdatedAt?: string | null;
 }
 
@@ -29,6 +33,7 @@ interface UseDebouncedChapterSaveOptions {
   metaSnapshot: StoryMetaSnapshot;
   enabled?: boolean;
   baselineKey?: string;
+  onSaveConflict?: (message: string) => void;
 }
 
 export function useDebouncedChapterSave({
@@ -36,6 +41,7 @@ export function useDebouncedChapterSave({
   metaSnapshot,
   enabled = true,
   baselineKey,
+  onSaveConflict,
 }: UseDebouncedChapterSaveOptions) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>(
     baselineKey ? "saved" : "idle",
@@ -44,6 +50,11 @@ export function useDebouncedChapterSave({
   const lastSavedRef = useRef<string>(baselineKey ?? "");
   const chapterRef = useRef(chapterSnapshot);
   const metaRef = useRef(metaSnapshot);
+  const onConflictRef = useRef(onSaveConflict);
+  useEffect(() => {
+    onConflictRef.current = onSaveConflict;
+  }, [onSaveConflict]);
+
   const lastDraftRef = useRef(chapterSnapshot.draftContent);
 
   useEffect(() => {
@@ -85,7 +96,10 @@ export function useDebouncedChapterSave({
           chapterId: chapter.chapterId,
           draftContent: chapter.draftContent,
           sceneBeat: chapter.sceneBeat,
+          title: chapter.title,
+          act: chapter.act,
           plotObjectives: chapter.plotObjectives,
+          plotBeats: chapter.plotBeats,
           activeChapterId: meta.activeChapterId,
           settingNotes: meta.settingNotes,
           sliderValue: meta.sliderValue,
@@ -94,7 +108,14 @@ export function useDebouncedChapterSave({
       });
 
       if (response.status === 409) {
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
         setSaveStatus("error");
+        onConflictRef.current?.(
+          data.error ??
+            "This chapter was updated elsewhere. Reload the story to avoid overwriting changes.",
+        );
         return;
       }
 

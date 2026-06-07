@@ -102,6 +102,13 @@ export function SmartCodexDrawer() {
                   >
                     Edit this card
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => engine.requestCharacterDelete(activeCard)}
+                    className="mt-2 block text-xs font-medium text-red-600 hover:text-red-800"
+                  >
+                    Delete character
+                  </button>
                 </article>
               )}
 
@@ -151,21 +158,32 @@ export function SmartCodexDrawer() {
 
               <div className="grid grid-cols-2 gap-2">
                 {deck.map((character, index) => (
-                  <button
+                  <div
                     key={character.id}
-                    type="button"
-                    onClick={() => setDeckIndex(index)}
-                    className={`rounded-xl border p-3 text-left transition ${
+                    className={`rounded-xl border p-3 transition ${
                       index === deckIndex % Math.max(deck.length, 1)
                         ? "border-amber-300 bg-amber-50/80"
                         : "border-stone-200 bg-white hover:border-amber-200"
                     }`}
                   >
-                    <p className="font-serif text-sm text-stone-900">
-                      {character.name}
-                    </p>
-                    <p className="text-[10px] text-stone-500">{character.role}</p>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeckIndex(index)}
+                      className="w-full text-left"
+                    >
+                      <p className="font-serif text-sm text-stone-900">
+                        {character.name}
+                      </p>
+                      <p className="text-[10px] text-stone-500">{character.role}</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => engine.requestCharacterDelete(character)}
+                      className="mt-2 text-[10px] text-red-600 hover:text-red-800"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 ))}
               </div>
 

@@ -12,6 +12,7 @@ import { WritingCanvas } from "./WritingCanvas";
 import { AiHubPanel } from "./AiHubPanel";
 import { CharacterCascadeModal } from "./CharacterCascadeModal";
 import { CharacterDeleteModal } from "./CharacterDeleteModal";
+import { ChapterDeleteModal } from "./ChapterDeleteModal";
 import { SmartCodexDrawer } from "./SmartCodexDrawer";
 import { previewActiveChapterDiff } from "@/lib/cascade-preview";
 
@@ -92,6 +93,16 @@ function StoryDashboardShell() {
           onReplacePlaceholder={() => engine.confirmCharacterDelete("placeholder")}
           onCodexOnly={() => engine.confirmCharacterDelete("codex")}
           onDismiss={engine.dismissCharacterDelete}
+        />
+      )}
+
+      {engine.chapterDeletePrompt && (
+        <ChapterDeleteModal
+          actLabel={engine.chapterDeletePrompt.chapter.act}
+          chapterTitle={engine.chapterDeletePrompt.chapter.title}
+          loading={engine.deleteChapterLoading}
+          onConfirm={engine.confirmChapterDelete}
+          onDismiss={engine.dismissChapterDelete}
         />
       )}
 
