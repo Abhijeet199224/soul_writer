@@ -232,6 +232,7 @@ export function StoryEngineProvider({
     initialWorkspace?.slider_value ?? 50,
   );
   const [chaptersLoaded, setChaptersLoaded] = useState(false);
+  const [chaptersPersistBaseline, setChaptersPersistBaseline] = useState(0);
 
   const [navigatorCollapsed, setNavigatorCollapsed] = useState(false);
   const [aiHubCollapsed, setAiHubCollapsed] = useState(false);
@@ -376,6 +377,37 @@ export function StoryEngineProvider({
     [initialWorkspace],
   );
 
+  const bumpPersistBaseline = useCallback(() => {
+    setChaptersPersistBaseline((value) => value + 1);
+  }, []);
+
+  const syncChapterTimestamps = useCallback(
+    async (chapterIds: string[]) => {
+      if (!chapterIds.length) return;
+
+      const response = await fetch(`/api/chapters?storyId=${story.id}`);
+      const data = await response.json();
+      if (!response.ok) return;
+
+      const timestamps = new Map<string, string>(
+        (data.chapters ?? []).map((chapter: StoryChapter) => [
+          chapter.id,
+          chapter.updated_at,
+        ]),
+      );
+
+      setChapters((prev) =>
+        prev.map((chapter) => {
+          if (!chapterIds.includes(chapter.id)) return chapter;
+          const updatedAt = timestamps.get(chapter.id);
+          return updatedAt ? { ...chapter, updated_at: updatedAt } : chapter;
+        }),
+      );
+      bumpPersistBaseline();
+    },
+    [story.id, bumpPersistBaseline],
+  );
+
   const loadChapters = useCallback(async () => {
     const response = await fetch(`/api/chapters?storyId=${story.id}`);
     const data = await response.json();
@@ -385,15 +417,28 @@ export function StoryEngineProvider({
     if (data.settingNotes !== undefined) setSettingNotes(data.settingNotes);
     if (data.sliderValue !== undefined) setSliderValue(data.sliderValue);
     setChaptersLoaded(true);
-  }, [story.id]);
+    bumpPersistBaseline();
+  }, [story.id, bumpPersistBaseline]);
+
+  const handleChapterPersisted = useCallback(
+    ({ chapterId, updatedAt }: { chapterId: string; updatedAt: string }) => {
+      setChapters((prev) =>
+        prev.map((chapter) =>
+          chapter.id === chapterId ? { ...chapter, updated_at: updatedAt } : chapter,
+        ),
+      );
+    },
+    [],
+  );
 
   const handleSaveConflict = useCallback(
     (message: string) => {
       setInlineNotice(message);
-      if (
-        message.includes("updated elsewhere") ||
-        message.includes("already exists")
-      ) {
+      if (message.includes("updated elsewhere")) {
+        void loadChapters();
+        return;
+      }
+      if (message.includes("already exists")) {
         void loadChapters();
       }
     },
@@ -405,7 +450,9 @@ export function StoryEngineProvider({
     metaSnapshot,
     enabled: chaptersLoaded && Boolean(activeChapter?.id),
     baselineKey,
+    persistBaselineKey: `${activeChapterId ?? ""}:${chaptersPersistBaseline}`,
     onSaveConflict: handleSaveConflict,
+    onChapterPersisted: handleChapterPersisted,
   });
 
   useEffect(() => {
@@ -545,6 +592,7 @@ export function StoryEngineProvider({
         }
 
         setChapters(data.chapters ?? []);
+        bumpPersistBaseline();
       } catch (error) {
         setInlineNotice(
           error instanceof Error ? error.message : "Failed to reorder Acts",
@@ -553,7 +601,7 @@ export function StoryEngineProvider({
         setReorderingChapter(false);
       }
     },
-    [story.id],
+    [story.id, bumpPersistBaseline],
   );
 
   const addPlotBeat = useCallback(() => {
@@ -955,6 +1003,8 @@ export function StoryEngineProvider({
         editorHandleRef.current?.replaceAllText(oldText, newText, matchMode);
       }
 
+      await syncChapterTimestamps([...patchById.keys()]);
+
       setSoulCheckResult(null);
       setActiveInsightIndex(null);
       clearRewriteStates();
@@ -982,6 +1032,7 @@ export function StoryEngineProvider({
     activeChapterId,
     presentNextCascadePrompt,
     clearRewriteStates,
+    syncChapterTimestamps,
   ]);
 
   const skipCharacterCascade = useCallback(() => {
@@ -1055,6 +1106,8 @@ export function StoryEngineProvider({
               "word",
             );
           }
+
+          await syncChapterTimestamps([...patchById.keys()]);
         }
 
         const supabase = (await import("@/lib/supabase/client")).createClient();
@@ -1075,7 +1128,7 @@ export function StoryEngineProvider({
         setDeleteCharacterLoading(false);
       }
     },
-    [deletePrompt, story.id, activeChapterId],
+    [deletePrompt, story.id, activeChapterId, syncChapterTimestamps],
   );
 
   const syncRewriteStatesFromDocument = useCallback(() => {

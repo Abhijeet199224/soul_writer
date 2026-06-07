@@ -74,6 +74,17 @@ export function normalizeChapter(row: Record<string, unknown>): StoryChapter {
   };
 }
 
+export function chapterTimestampsEqual(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
+  if (!left || !right) return left === right;
+  const leftMs = Date.parse(left);
+  const rightMs = Date.parse(right);
+  if (Number.isNaN(leftMs) || Number.isNaN(rightMs)) return left === right;
+  return leftMs === rightMs;
+}
+
 export function getGhostwriteTier(sliderValue: number): GhostwriteTier {
   if (sliderValue <= 30) return "assist";
   if (sliderValue <= 70) return "copilot";
