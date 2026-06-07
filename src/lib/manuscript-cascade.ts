@@ -1,5 +1,9 @@
 import type { StoryChapter } from "@/lib/types";
-import { replaceNameInHtmlDraft, countNameMentions } from "@/lib/character-name-sync";
+import {
+  type CascadeMatchMode,
+  countTextMentions,
+  replaceTextInHtmlDraft,
+} from "@/lib/character-attribute-sync";
 
 export interface ChapterDraftPatch {
   id: string;
@@ -7,16 +11,27 @@ export interface ChapterDraftPatch {
   mentionsReplaced: number;
 }
 
-export function countNameMentionsAcrossChapters(
+export function countTextMentionsAcrossChapters(
   chapters: StoryChapter[],
-  name: string,
+  text: string,
+  mode: CascadeMatchMode,
 ): number {
   return chapters.reduce(
-    (total, chapter) => total + countNameMentions(chapter.draft_content, name),
+    (total, chapter) =>
+      total + countTextMentions(chapter.draft_content, text, mode),
     0,
   );
 }
 
+/** @deprecated Use countTextMentionsAcrossChapters with mode "word". */
+export function countNameMentionsAcrossChapters(
+  chapters: StoryChapter[],
+  name: string,
+): number {
+  return countTextMentionsAcrossChapters(chapters, name, "word");
+}
+
+/** @deprecated Use countTextMentionsAcrossChapters with mode "word". */
 export function storyContainsCharacterName(
   chapters: StoryChapter[],
   name: string,
@@ -24,22 +39,23 @@ export function storyContainsCharacterName(
   return countNameMentionsAcrossChapters(chapters, name) > 0;
 }
 
-/** Build draft patches for every chapter that mentions `oldName`. */
-export function buildChapterNameCascadePatches(
+export function buildChapterTextCascadePatches(
   chapters: Array<{ id: string; draft_content: string }>,
-  oldName: string,
-  newName: string,
+  oldText: string,
+  newText: string,
+  mode: CascadeMatchMode,
 ): ChapterDraftPatch[] {
   const patches: ChapterDraftPatch[] = [];
 
   for (const chapter of chapters) {
-    const before = countNameMentions(chapter.draft_content, oldName);
+    const before = countTextMentions(chapter.draft_content, oldText, mode);
     if (before === 0) continue;
 
-    const draft_content = replaceNameInHtmlDraft(
+    const draft_content = replaceTextInHtmlDraft(
       chapter.draft_content,
-      oldName,
-      newName,
+      oldText,
+      newText,
+      mode,
     );
 
     patches.push({
@@ -50,4 +66,13 @@ export function buildChapterNameCascadePatches(
   }
 
   return patches;
+}
+
+/** @deprecated Use buildChapterTextCascadePatches with mode "word". */
+export function buildChapterNameCascadePatches(
+  chapters: Array<{ id: string; draft_content: string }>,
+  oldName: string,
+  newName: string,
+): ChapterDraftPatch[] {
+  return buildChapterTextCascadePatches(chapters, oldName, newName, "word");
 }

@@ -132,7 +132,7 @@ export function SmartCodexDrawer() {
                     storyId={engine.story.id}
                     character={editing ?? undefined}
                     onSaved={(character) => {
-                      engine.handleCharacterSaved(character, editing?.name);
+                      engine.handleCharacterSaved(character, editing ?? undefined);
                       setEditing(null);
                       setShowForm(false);
                     }}

@@ -21,6 +21,7 @@ export interface Character {
   name: string;
   role: CharacterRole;
   age: number | null;
+  pronouns: string | null;
   physical_appearance: string | null;
   core_flaw: string | null;
   primary_motivation: string | null;
@@ -67,6 +68,7 @@ export type CharacterInput = Pick<
   | "name"
   | "role"
   | "age"
+  | "pronouns"
   | "physical_appearance"
   | "core_flaw"
   | "primary_motivation"

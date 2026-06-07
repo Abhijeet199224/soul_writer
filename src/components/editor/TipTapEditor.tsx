@@ -34,6 +34,7 @@ import {
   loadDocumentWithoutHistory,
   replaceTextInEditor,
   replaceAllWordsInEditor,
+  replaceAllTextInEditor,
 } from "@/lib/editor-transactions";
 import { clearHighlightForTargetText } from "@/lib/soul-check-highlights";
 import { CharacterHoverCard } from "@/components/editor/CharacterHoverCard";
@@ -43,6 +44,11 @@ export interface TipTapEditorHandle {
   insertAtCursor: (text: string) => boolean;
   replaceTargetText: (searchText: string, replacement: string) => boolean;
   replaceAllWords: (searchWord: string, replacement: string) => boolean;
+  replaceAllText: (
+    searchText: string,
+    replacement: string,
+    mode?: "word" | "phrase",
+  ) => boolean;
   appendParagraph: (prose: string) => boolean;
   loadDocument: (html: string) => boolean;
   documentContainsText: (text: string) => boolean;
@@ -168,6 +174,11 @@ export function TipTapEditor({
         replaceTextInEditor(editor, searchText, replacement),
       replaceAllWords: (searchWord: string, replacement: string) =>
         replaceAllWordsInEditor(editor, searchWord, replacement),
+      replaceAllText: (
+        searchText: string,
+        replacement: string,
+        mode: "word" | "phrase" = "phrase",
+      ) => replaceAllTextInEditor(editor, searchText, replacement, mode),
       appendParagraph: (prose: string) =>
         appendParagraphInEditor(editor, prose),
       loadDocument: (html: string) => loadDocumentWithoutHistory(editor, html),

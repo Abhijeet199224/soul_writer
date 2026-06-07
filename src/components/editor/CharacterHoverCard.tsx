@@ -36,8 +36,13 @@ export function CharacterHoverCard({
       </p>
       <h4 className="mt-1 font-serif text-lg text-stone-900">{character.name}</h4>
       <p className="text-xs text-stone-500">
-        {character.role}
-        {character.age != null ? ` · Age ${character.age}` : ""}
+        {[
+          character.role,
+          character.age != null ? `Age ${character.age}` : null,
+          character.pronouns ?? null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
       </p>
 
       <dl className="mt-3 space-y-2 text-sm">

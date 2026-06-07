@@ -234,7 +234,7 @@ export function NavigatorPanel() {
                   storyId={story.id}
                   character={editing ?? undefined}
                   onSaved={(character) => {
-                    handleCharacterSaved(character, editing?.name);
+                    handleCharacterSaved(character, editing ?? undefined);
                     setEditing(null);
                     setShowCharacterForm(false);
                   }}
