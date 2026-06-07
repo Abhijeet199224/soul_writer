@@ -11,6 +11,7 @@ export interface CascadeTextRequest {
   oldText: string;
   newText: string;
   matchMode?: CascadeMatchMode;
+  excludeChapterIds?: string[];
 }
 
 export async function runCharacterTextCascade(
@@ -22,15 +23,20 @@ export async function runCharacterTextCascade(
   const oldText = payload.oldText.trim();
   const newText = payload.newText.trim();
   const matchMode: CascadeMatchMode = payload.matchMode ?? "phrase";
+  const exclude = new Set(payload.excludeChapterIds ?? []);
 
-  if (!storyId || !oldText || !newText) {
+  if (!storyId || !oldText) {
     return NextResponse.json(
-      { error: "storyId, oldText, and newText are required" },
+      { error: "storyId and oldText are required" },
       { status: 400 },
     );
   }
 
-  if (oldText.toLowerCase() === newText.toLowerCase()) {
+  if (newText === undefined) {
+    return NextResponse.json({ error: "newText is required" }, { status: 400 });
+  }
+
+  if (newText.length > 0 && oldText.toLowerCase() === newText.toLowerCase()) {
     return NextResponse.json(
       { error: "oldText and newText must differ" },
       { status: 400 },
@@ -62,7 +68,7 @@ export async function runCharacterTextCascade(
     oldText,
     newText,
     matchMode,
-  );
+  ).filter((patch) => !exclude.has(patch.id));
 
   if (!patches.length) {
     return NextResponse.json({
@@ -71,36 +77,20 @@ export async function runCharacterTextCascade(
     });
   }
 
-  const updatedAt = new Date().toISOString();
+  const { error: rpcError } = await supabase.rpc("cascade_story_chapter_drafts", {
+    p_story_id: storyId,
+    p_updates: patches.map((patch) => ({
+      id: patch.id,
+      draft_content: patch.draft_content,
+    })),
+  });
 
-  const results = await Promise.all(
-    patches.map((patch) =>
-      supabase
-        .from("story_chapters")
-        .update({
-          draft_content: patch.draft_content,
-          updated_at: updatedAt,
-        })
-        .eq("id", patch.id)
-        .eq("story_id", storyId)
-        .select("id, draft_content")
-        .single(),
-    ),
-  );
-
-  const failures = results.filter(({ error }) => error);
-  if (failures.length) {
+  if (rpcError) {
     return NextResponse.json(
-      { error: failures[0].error?.message ?? "Cascade update failed" },
+      { error: rpcError.message ?? "Cascade update failed" },
       { status: 500 },
     );
   }
-
-  const updatedChapters = results.map(({ data }, index) => ({
-    id: data!.id as string,
-    draft_content: data!.draft_content as string,
-    mentionsReplaced: patches[index].mentionsReplaced,
-  }));
 
   const totalMentionsReplaced = patches.reduce(
     (sum, patch) => sum + patch.mentionsReplaced,
@@ -108,7 +98,31 @@ export async function runCharacterTextCascade(
   );
 
   return NextResponse.json({
-    chapters: updatedChapters,
+    chapters: patches.map((patch) => ({
+      id: patch.id,
+      draft_content: patch.draft_content,
+      mentionsReplaced: patch.mentionsReplaced,
+    })),
     totalMentionsReplaced,
+  });
+}
+
+export async function runCharacterMentionRemoval(
+  supabase: SupabaseClient,
+  userId: string,
+  payload: {
+    storyId: string;
+    searchText: string;
+    matchMode?: CascadeMatchMode;
+    replacement?: string;
+    excludeChapterIds?: string[];
+  },
+) {
+  return runCharacterTextCascade(supabase, userId, {
+    storyId: payload.storyId,
+    oldText: payload.searchText,
+    newText: payload.replacement ?? "",
+    matchMode: payload.matchMode ?? "word",
+    excludeChapterIds: payload.excludeChapterIds,
   });
 }

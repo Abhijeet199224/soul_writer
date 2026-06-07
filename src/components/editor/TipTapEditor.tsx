@@ -69,6 +69,7 @@ interface TipTapEditorProps {
   selectionLoading?: boolean;
   placeholder?: string;
   onEditorReady?: (handle: TipTapEditorHandle | null) => void;
+  externalSyncPaused?: boolean;
 }
 
 function MenuButton({
@@ -111,6 +112,7 @@ export function TipTapEditor({
   selectionLoading = false,
   placeholder = "Write your scene…",
   onEditorReady,
+  externalSyncPaused = false,
 }: TipTapEditorProps) {
   const highlightHandlerRef = useRef(onHighlightInsight);
   const afterUpdateRef = useRef(onAfterUpdate);
@@ -268,19 +270,21 @@ export function TipTapEditor({
     const keyChanged =
       documentKey != null && loadedDocumentKeyRef.current !== documentKey;
 
-      if (keyChanged) {
-        loadDocumentWithoutHistory(editor, normalized);
-        loadedDocumentKeyRef.current = documentKey;
-        lastSelectionInsightRef.current = null;
-        appliedCharactersRef.current = "";
-        clearSoulCheckHighlights(editor);
-        return;
-      }
+    if (keyChanged) {
+      loadDocumentWithoutHistory(editor, normalized);
+      loadedDocumentKeyRef.current = documentKey;
+      lastSelectionInsightRef.current = null;
+      appliedCharactersRef.current = "";
+      clearSoulCheckHighlights(editor);
+      return;
+    }
+
+    if (externalSyncPaused) return;
 
     if (normalized !== editor.getHTML()) {
       loadDocumentWithoutHistory(editor, normalized);
     }
-  }, [content, documentKey, editor]);
+  }, [content, documentKey, editor, externalSyncPaused]);
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
@@ -304,7 +308,7 @@ export function TipTapEditor({
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
-    const key = `${documentKey ?? ""}|${characters.map((c) => c.id + c.name).join("|")}`;
+    const key = `${documentKey ?? ""}|${characters.map((c) => c.id + c.name + (c.aliases ?? "")).join("|")}`;
     if (key === appliedCharactersRef.current) return;
     appliedCharactersRef.current = key;
     applyCharacterCodexMarks(editor, characters);

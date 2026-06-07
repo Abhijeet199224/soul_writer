@@ -17,6 +17,7 @@ export function formatCharacterContext(characters: Character[]): string {
         character.pronouns
           ? `Pronouns: ${character.pronouns}`
           : null,
+        character.voice_notes ? `Voice: ${character.voice_notes}` : null,
         `Flaw: ${character.core_flaw ?? "unspecified"}`,
         `Motivation: ${character.primary_motivation ?? "unspecified"}`,
         character.physical_appearance

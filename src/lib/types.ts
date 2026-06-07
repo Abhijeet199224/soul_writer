@@ -15,6 +15,11 @@ export interface Story {
   updated_at: string;
 }
 
+export interface CharacterRelationship {
+  character_name: string;
+  relationship: string;
+}
+
 export interface Character {
   id: string;
   story_id: string;
@@ -22,6 +27,9 @@ export interface Character {
   role: CharacterRole;
   age: number | null;
   pronouns: string | null;
+  aliases: string | null;
+  voice_notes: string | null;
+  relationships: CharacterRelationship[] | null;
   physical_appearance: string | null;
   core_flaw: string | null;
   primary_motivation: string | null;
@@ -69,6 +77,9 @@ export type CharacterInput = Pick<
   | "role"
   | "age"
   | "pronouns"
+  | "aliases"
+  | "voice_notes"
+  | "relationships"
   | "physical_appearance"
   | "core_flaw"
   | "primary_motivation"

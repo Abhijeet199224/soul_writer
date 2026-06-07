@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import type { Character } from "@/lib/types";
 import { useStoryEngine } from "@/context/StoryEngineContext";
 import { CharacterForm } from "@/components/characters/CharacterForm";
+import { ManuscriptSearchPanel } from "@/components/dashboard/ManuscriptSearchPanel";
 
 type NavigatorSection = "chapters" | "characters" | "settings";
 
@@ -27,14 +27,13 @@ export function NavigatorPanel() {
     addingChapter,
     characters,
     handleCharacterSaved,
-    setCharacters,
+    requestCharacterDelete,
     settingNotes,
     setSettingNotes,
     updateChapterMeta,
     navigatorCollapsed,
     setNavigatorCollapsed,
   } = useStoryEngine();
-
   const [section, setSection] = useState<NavigatorSection>("chapters");
   const [editing, setEditing] = useState<Character | null>(null);
   const [showCharacterForm, setShowCharacterForm] = useState(false);
@@ -55,17 +54,7 @@ export function NavigatorPanel() {
   }
 
   async function handleDeleteCharacter(character: Character) {
-    if (!confirm(`Delete ${character.name}?`)) return;
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("characters")
-      .delete()
-      .eq("id", character.id);
-    if (error) {
-      alert(error.message);
-      return;
-    }
-    setCharacters(characters.filter((item) => item.id !== character.id));
+    requestCharacterDelete(character);
   }
 
   return (
@@ -106,6 +95,11 @@ export function NavigatorPanel() {
           </button>
         ))}
       </div>
+
+      <ManuscriptSearchPanel
+        chapters={chapters}
+        onJumpToChapter={(chapterId) => switchChapter(chapterId)}
+      />
 
       <div className="flex-1 overflow-y-auto p-4">
         {section === "chapters" && (
@@ -233,8 +227,8 @@ export function NavigatorPanel() {
                 <CharacterForm
                   storyId={story.id}
                   character={editing ?? undefined}
-                  onSaved={(character) => {
-                    handleCharacterSaved(character, editing ?? undefined);
+                  onSaved={(character, previous, options) => {
+                    handleCharacterSaved(character, previous, options);
                     setEditing(null);
                     setShowCharacterForm(false);
                   }}

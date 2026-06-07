@@ -5,6 +5,7 @@ import { Loader2, Shuffle, Sparkles } from "lucide-react";
 import type { Character } from "@/lib/types";
 import { useStoryEngine } from "@/context/StoryEngineContext";
 import { CharacterForm } from "@/components/characters/CharacterForm";
+import { BulkCharacterImport } from "@/components/characters/BulkCharacterImport";
 import { Sheet, SheetHeader } from "@/components/ui/sheet";
 
 const roleColors: Record<Character["role"], string> = {
@@ -131,8 +132,12 @@ export function SmartCodexDrawer() {
                   <CharacterForm
                     storyId={engine.story.id}
                     character={editing ?? undefined}
-                    onSaved={(character) => {
-                      engine.handleCharacterSaved(character, editing ?? undefined);
+                    onSaved={(character, previous, options) => {
+                      engine.handleCharacterSaved(
+                        character,
+                        previous,
+                        options,
+                      );
                       setEditing(null);
                       setShowForm(false);
                     }}
@@ -163,11 +168,47 @@ export function SmartCodexDrawer() {
                   </button>
                 ))}
               </div>
+
+              <BulkCharacterImport
+                storyId={engine.story.id}
+                onImported={async () => {
+                  const { createClient } = await import("@/lib/supabase/client");
+                  const supabase = createClient();
+                  const { data } = await supabase
+                    .from("characters")
+                    .select("*")
+                    .eq("story_id", engine.story.id)
+                    .order("name");
+                  if (data) engine.setCharacters(data);
+                }}
+              />
             </div>
           )}
 
           {tab === "lore" && (
             <div className="space-y-4">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-stone-600">
+                  Scope tone check to character
+                </span>
+                <select
+                  value={engine.toneAlignmentCharacterId ?? ""}
+                  onChange={(event) =>
+                    engine.setToneAlignmentCharacterId(
+                      event.target.value || null,
+                    )
+                  }
+                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-amber-400"
+                >
+                  <option value="">All characters in chapter</option>
+                  {engine.characters.map((character) => (
+                    <option key={character.id} value={character.id}>
+                      {character.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <textarea
                 value={engine.settingNotes}
                 onChange={(event) => engine.setSettingNotes(event.target.value)}

@@ -8,7 +8,9 @@ export type CascadeableCharacterField =
   | "physical_appearance"
   | "core_flaw"
   | "primary_motivation"
-  | "pronouns";
+  | "pronouns"
+  | "age"
+  | "alias";
 
 export interface CharacterTextChange {
   field: CascadeableCharacterField;
@@ -25,10 +27,68 @@ export const CHARACTER_FIELD_LABELS: Record<CascadeableCharacterField, string> =
     core_flaw: "core flaw",
     primary_motivation: "primary motivation",
     pronouns: "pronouns",
+    age: "age reference",
+    alias: "character alias",
   };
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function preserveReplacementCase(original: string, replacement: string): string {
+  if (!replacement) return replacement;
+  if (original === original.toUpperCase()) return replacement.toUpperCase();
+  if (original === original.toLowerCase()) return replacement.toLowerCase();
+  if (original[0] === original[0]?.toUpperCase()) {
+    return replacement.charAt(0).toUpperCase() + replacement.slice(1);
+  }
+  return replacement;
+}
+
+function parseAliasList(value: string | null | undefined): string[] {
+  return normalizeNullable(value)
+    .split(/[,;|]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function buildAgeChange(
+  previousAge: number | null,
+  nextAge: number | null,
+  optIn: boolean,
+): CharacterTextChange | null {
+  if (!optIn || previousAge == null || nextAge == null || previousAge === nextAge) {
+    return null;
+  }
+  return {
+    field: "age",
+    fieldLabel: CHARACTER_FIELD_LABELS.age,
+    oldText: `Age ${previousAge}`,
+    newText: `Age ${nextAge}`,
+    matchMode: "phrase",
+  };
+}
+
+function buildAliasChanges(
+  previousAliases: string | null | undefined,
+  nextAliases: string | null | undefined,
+): CharacterTextChange[] {
+  const oldAliases = parseAliasList(previousAliases);
+  const newAliases = new Set(parseAliasList(nextAliases).map((alias) => alias.toLowerCase()));
+  const changes: CharacterTextChange[] = [];
+
+  for (const alias of oldAliases) {
+    if (newAliases.has(alias.toLowerCase())) continue;
+    changes.push({
+      field: "alias",
+      fieldLabel: `${CHARACTER_FIELD_LABELS.alias} “${alias}”`,
+      oldText: alias,
+      newText: "",
+      matchMode: "word",
+    });
+  }
+
+  return changes;
 }
 
 function normalizeNullable(value: string | null | undefined): string {
@@ -100,6 +160,7 @@ function buildPhraseChange(
 export function detectCharacterTextChanges(
   previous: Character,
   next: Character,
+  options?: { includeAgeCascade?: boolean },
 ): CharacterTextChange[] {
   const changes: CharacterTextChange[] = [];
 
@@ -115,6 +176,15 @@ export function detectCharacterTextChanges(
       matchMode: "word",
     });
   }
+
+  changes.push(...buildAliasChanges(previous.aliases, next.aliases));
+
+  const ageChange = buildAgeChange(
+    previous.age,
+    next.age,
+    options?.includeAgeCascade ?? false,
+  );
+  if (ageChange) changes.push(ageChange);
 
   const phraseFields = [
     "physical_appearance",
@@ -168,13 +238,13 @@ export function replaceTextInHtmlDraft(
 ): string {
   const from = oldText.trim();
   const to = newText.trim();
-  if (!from || !to || from === to) return html;
+  if (!from || from === to) return html;
 
   if (mode === "word") {
     const pattern = new RegExp(`\\b${escapeRegex(from)}\\b`, "gi");
-    return html.replace(pattern, to);
+    return html.replace(pattern, (match) => preserveReplacementCase(match, to));
   }
 
   const pattern = new RegExp(escapeRegex(from), "gi");
-  return html.replace(pattern, to);
+  return html.replace(pattern, (match) => preserveReplacementCase(match, to));
 }

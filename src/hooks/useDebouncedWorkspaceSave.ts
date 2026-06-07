@@ -14,6 +14,7 @@ export interface ChapterSaveSnapshot {
   draftContent: string;
   sceneBeat: string;
   plotObjectives?: string;
+  expectedUpdatedAt?: string | null;
 }
 
 export interface StoryMetaSnapshot {
@@ -88,8 +89,14 @@ export function useDebouncedChapterSave({
           activeChapterId: meta.activeChapterId,
           settingNotes: meta.settingNotes,
           sliderValue: meta.sliderValue,
+          expectedUpdatedAt: chapter.expectedUpdatedAt,
         }),
       });
+
+      if (response.status === 409) {
+        setSaveStatus("error");
+        return;
+      }
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
