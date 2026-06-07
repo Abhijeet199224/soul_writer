@@ -12,7 +12,7 @@ import {
 interface CharacterFormProps {
   storyId: string;
   character?: Character;
-  onSaved: (character: Character, previousName?: string) => void;
+  onSaved: (character: Character, previous?: Character) => void;
   onCancel?: () => void;
 }
 
@@ -20,6 +20,7 @@ const emptyForm: CharacterInput = {
   name: "",
   role: "Protagonist",
   age: null,
+  pronouns: "",
   physical_appearance: "",
   core_flaw: "",
   primary_motivation: "",
@@ -37,6 +38,7 @@ export function CharacterForm({
           name: character.name,
           role: character.role,
           age: character.age,
+          pronouns: character.pronouns ?? "",
           physical_appearance: character.physical_appearance ?? "",
           core_flaw: character.core_flaw ?? "",
           primary_motivation: character.primary_motivation ?? "",
@@ -63,6 +65,7 @@ export function CharacterForm({
       name: form.name.trim(),
       role: form.role,
       age: form.age,
+      pronouns: form.pronouns?.trim() || null,
       physical_appearance: form.physical_appearance?.trim() || null,
       core_flaw: form.core_flaw?.trim() || null,
       primary_motivation: form.primary_motivation?.trim() || null,
@@ -85,7 +88,7 @@ export function CharacterForm({
       return;
     }
 
-    onSaved(data as Character, character?.name);
+    onSaved(data as Character, character);
     if (!character) {
       setForm(emptyForm);
     }
@@ -143,6 +146,18 @@ export function CharacterForm({
             }
             className="w-full rounded-xl border border-stone-200 px-4 py-3 outline-none focus:border-amber-400"
             placeholder="32"
+          />
+        </label>
+
+        <label className="block sm:col-span-1">
+          <span className="mb-1 block text-sm font-medium text-stone-700">
+            Pronouns
+          </span>
+          <input
+            value={form.pronouns ?? ""}
+            onChange={(e) => updateField("pronouns", e.target.value)}
+            className="w-full rounded-xl border border-stone-200 px-4 py-3 outline-none focus:border-amber-400"
+            placeholder="she/her, he/him, they/them"
           />
         </label>
       </div>

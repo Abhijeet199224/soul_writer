@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { runCharacterTextCascade } from "@/lib/character-text-cascade";
 
-/** Backward-compatible alias for name cascades. */
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -17,12 +16,12 @@ export async function POST(request: Request) {
     const body = await request.json();
     return runCharacterTextCascade(supabase, user.id, {
       storyId: String(body.storyId ?? ""),
-      oldText: String(body.oldName ?? body.oldText ?? ""),
-      newText: String(body.newName ?? body.newText ?? ""),
-      matchMode: "word",
+      oldText: String(body.oldText ?? ""),
+      newText: String(body.newText ?? ""),
+      matchMode: body.matchMode === "word" ? "word" : "phrase",
     });
   } catch (err) {
-    console.error("POST /api/characters/cascade-rename:", err);
+    console.error("POST /api/characters/cascade-text:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

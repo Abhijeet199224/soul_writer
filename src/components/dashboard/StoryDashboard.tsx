@@ -10,7 +10,7 @@ import {
 import { NavigatorPanel } from "./NavigatorPanel";
 import { WritingCanvas } from "./WritingCanvas";
 import { AiHubPanel } from "./AiHubPanel";
-import { RenameConfirmModal } from "./RenameConfirmModal";
+import { CharacterCascadeModal } from "./CharacterCascadeModal";
 import { SmartCodexDrawer } from "./SmartCodexDrawer";
 
 interface StoryDashboardProps {
@@ -52,14 +52,16 @@ function StoryDashboardShell() {
         </span>
       </div>
 
-      {engine.renamePrompt && (
-        <RenameConfirmModal
-          oldName={engine.renamePrompt.oldName}
-          newName={engine.renamePrompt.newName}
-          mentionCount={engine.renamePrompt.mentionCount}
-          loading={engine.cascadeRenameLoading}
-          onConfirm={engine.confirmRenameInDraft}
-          onDismiss={engine.dismissRenamePrompt}
+      {engine.cascadePrompt && (
+        <CharacterCascadeModal
+          fieldLabel={engine.cascadePrompt.fieldLabel}
+          oldText={engine.cascadePrompt.oldText}
+          newText={engine.cascadePrompt.newText}
+          mentionCount={engine.cascadePrompt.mentionCount}
+          queuedCount={engine.cascadeQueueCount}
+          loading={engine.cascadeSyncLoading}
+          onConfirm={engine.confirmCharacterCascade}
+          onDismiss={engine.dismissCharacterCascade}
         />
       )}
 

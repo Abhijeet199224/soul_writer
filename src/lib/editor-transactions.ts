@@ -35,6 +35,32 @@ function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** Case-insensitive literal phrase matches in the document. */
+export function findPhraseRangesInDoc(
+  doc: Editor["state"]["doc"],
+  phrase: string,
+): { from: number; to: number }[] {
+  const needle = phrase.trim();
+  if (!needle) return [];
+
+  const pattern = new RegExp(escapeRegex(needle), "gi");
+  const ranges: { from: number; to: number }[] = [];
+
+  doc.descendants((node, pos) => {
+    if (!node.isText || !node.text) return;
+    pattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(node.text)) !== null) {
+      ranges.push({
+        from: pos + match.index,
+        to: pos + match.index + match[0].length,
+      });
+    }
+  });
+
+  return ranges;
+}
+
 /** Case-insensitive whole-word matches in the document. */
 export function findWordRangesInDoc(
   doc: Editor["state"]["doc"],
@@ -112,16 +138,29 @@ export function replaceTextInEditor(
     .run();
 }
 
-/** Replace every whole-word match in one undoable transaction via insertContentAt semantics. */
+/** Replace every whole-word match in one undoable transaction. */
 export function replaceAllWordsInEditor(
   editor: Editor,
   searchWord: string,
   replacement: string,
 ): boolean {
-  const trimmed = replacement.trim();
-  if (!searchWord.trim() || !trimmed) return false;
+  return replaceAllTextInEditor(editor, searchWord, replacement, "word");
+}
 
-  const ranges = findWordRangesInDoc(editor.state.doc, searchWord);
+/** Replace every phrase or word match in one undoable transaction. */
+export function replaceAllTextInEditor(
+  editor: Editor,
+  searchText: string,
+  replacement: string,
+  mode: "word" | "phrase" = "phrase",
+): boolean {
+  const trimmed = replacement.trim();
+  if (!searchText.trim() || !trimmed) return false;
+
+  const ranges =
+    mode === "word"
+      ? findWordRangesInDoc(editor.state.doc, searchText)
+      : findPhraseRangesInDoc(editor.state.doc, searchText);
   if (!ranges.length) return false;
 
   return editor

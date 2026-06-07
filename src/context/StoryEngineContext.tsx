@@ -19,7 +19,11 @@ import {
 } from "@/lib/draft-content";
 import { useStoryBibleIndex } from "@/hooks/useStoryBibleIndex";
 import { useDebouncedChapterSave } from "@/hooks/useDebouncedWorkspaceSave";
-import { countNameMentionsAcrossChapters } from "@/lib/manuscript-cascade";
+import { countTextMentionsAcrossChapters } from "@/lib/manuscript-cascade";
+import {
+  detectCharacterTextChanges,
+  type CascadeMatchMode,
+} from "@/lib/character-attribute-sync";
 import type {
   GhostwriteAiResult,
   SoulCheckAiResult,
@@ -33,10 +37,12 @@ interface StoryEngineProviderProps {
   children: ReactNode;
 }
 
-interface CharacterRenamePrompt {
-  oldName: string;
-  newName: string;
+interface CharacterCascadePrompt {
+  fieldLabel: string;
+  oldText: string;
+  newText: string;
   mentionCount: number;
+  matchMode: CascadeMatchMode;
 }
 
 export interface InsightRewriteState {
@@ -80,8 +86,9 @@ interface StoryEngineContextValue {
   linkedNames: string[];
   focusMode: boolean;
   chaptersLoaded: boolean;
-  renamePrompt: CharacterRenamePrompt | null;
-  cascadeRenameLoading: boolean;
+  cascadePrompt: CharacterCascadePrompt | null;
+  cascadeQueueCount: number;
+  cascadeSyncLoading: boolean;
   rewriteStates: Record<number, InsightRewriteState>;
   customRewriteLoading: number | null;
   registerEditor: (handle: TipTapEditorHandle | null) => void;
@@ -97,9 +104,9 @@ interface StoryEngineContextValue {
   setSettingNotes: (notes: string) => void;
   updateChapterMeta: (updates: Partial<StoryChapter>) => void;
   setCharacters: (characters: Character[]) => void;
-  handleCharacterSaved: (character: Character, previousName?: string) => void;
-  confirmRenameInDraft: () => Promise<void>;
-  dismissRenamePrompt: () => void;
+  handleCharacterSaved: (character: Character, previous?: Character) => void;
+  confirmCharacterCascade: () => Promise<void>;
+  dismissCharacterCascade: () => void;
   runSelectionSoulCheck: (selectedText: string) => Promise<void>;
   runSoulCheck: () => Promise<void>;
   runGhostwrite: () => Promise<void>;
@@ -182,9 +189,11 @@ export function StoryEngineProvider({
   const [activeInsightIndex, setActiveInsightIndex] = useState<number | null>(
     null,
   );
-  const [renamePrompt, setRenamePrompt] =
-    useState<CharacterRenamePrompt | null>(null);
-  const [cascadeRenameLoading, setCascadeRenameLoading] = useState(false);
+  const [cascadePrompt, setCascadePrompt] =
+    useState<CharacterCascadePrompt | null>(null);
+  const [cascadeQueueCount, setCascadeQueueCount] = useState(0);
+  const [cascadeSyncLoading, setCascadeSyncLoading] = useState(false);
+  const cascadeQueueRef = useRef<CharacterCascadePrompt[]>([]);
   const [rewriteStates, setRewriteStates] = useState<
     Record<number, InsightRewriteState>
   >({});
@@ -502,8 +511,32 @@ export function StoryEngineProvider({
     }
   }, [story.id, plainDraft, activeChapterId, settingNotes]);
 
+  const presentNextCascadePrompt = useCallback(() => {
+    const next = cascadeQueueRef.current.shift() ?? null;
+    setCascadeQueueCount(cascadeQueueRef.current.length);
+    setCascadePrompt(next);
+  }, []);
+
+  const enqueueCascadePrompts = useCallback(
+    (prompts: CharacterCascadePrompt[]) => {
+      if (!prompts.length) return;
+
+      if (cascadePrompt) {
+        cascadeQueueRef.current.push(...prompts);
+        setCascadeQueueCount(cascadeQueueRef.current.length);
+        return;
+      }
+
+      const [first, ...rest] = prompts;
+      cascadeQueueRef.current = rest;
+      setCascadeQueueCount(rest.length);
+      setCascadePrompt(first);
+    },
+    [cascadePrompt],
+  );
+
   const handleCharacterSaved = useCallback(
-    (character: Character, previousName?: string) => {
+    (character: Character, previous?: Character) => {
       setCharacters((prev) => {
         const exists = prev.some((c) => c.id === character.id);
         const next = exists
@@ -512,45 +545,51 @@ export function StoryEngineProvider({
         return next.sort((a, b) => a.name.localeCompare(b.name));
       });
 
-      if (previousName && previousName !== character.name) {
-        const mentionCount = countNameMentionsAcrossChapters(
-          chapters,
-          previousName,
-        );
-        if (mentionCount > 0) {
-          setRenamePrompt({
-            oldName: previousName,
-            newName: character.name,
-            mentionCount,
-          });
-        }
-      }
+      if (!previous) return;
+
+      const prompts = detectCharacterTextChanges(previous, character)
+        .map((change) => ({
+          fieldLabel: change.fieldLabel,
+          oldText: change.oldText,
+          newText: change.newText,
+          matchMode: change.matchMode,
+          mentionCount: countTextMentionsAcrossChapters(
+            chapters,
+            change.oldText,
+            change.matchMode,
+          ),
+        }))
+        .filter((prompt) => prompt.mentionCount > 0)
+        .sort((a, b) => b.mentionCount - a.mentionCount);
+
+      enqueueCascadePrompts(prompts);
     },
-    [chapters],
+    [chapters, enqueueCascadePrompts],
   );
 
-  const confirmRenameInDraft = useCallback(async () => {
-    if (!renamePrompt) return;
+  const confirmCharacterCascade = useCallback(async () => {
+    if (!cascadePrompt) return;
 
-    const { oldName, newName } = renamePrompt;
-    setCascadeRenameLoading(true);
+    const { oldText, newText, matchMode } = cascadePrompt;
+    setCascadeSyncLoading(true);
     setInlineNotice(null);
 
     try {
-      const res = await fetch("/api/characters/cascade-rename", {
+      const res = await fetch("/api/characters/cascade-text", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           storyId: story.id,
-          oldName,
-          newName,
+          oldText,
+          newText,
+          matchMode,
         }),
       });
 
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(
-          err.error ?? "Failed to cascade rename across manuscript",
+          err.error ?? "Failed to cascade character update across manuscript",
         );
       }
 
@@ -565,28 +604,34 @@ export function StoryEngineProvider({
       setChapters((prev) =>
         prev.map((chapter) => {
           const patched = patchById.get(chapter.id);
-          return patched !== undefined
-            ? { ...chapter, draft_content: patched }
-            : chapter;
+          if (patched === undefined) return chapter;
+          if (chapter.id === activeChapterId) return chapter;
+          return { ...chapter, draft_content: patched };
         }),
       );
 
       if (activeChapterId && patchById.has(activeChapterId)) {
-        editorHandleRef.current?.replaceAllWords(oldName, newName);
+        editorHandleRef.current?.replaceAllText(oldText, newText, matchMode);
       }
 
-      setRenamePrompt(null);
+      presentNextCascadePrompt();
     } catch (err) {
-      console.error("[cascade-rename]", err);
+      console.error("[cascade-text]", err);
       setInlineNotice(
         err instanceof Error
           ? err.message
-          : "Could not sync character rename across manuscript.",
+          : "Could not sync character update across manuscript.",
       );
     } finally {
-      setCascadeRenameLoading(false);
+      setCascadeSyncLoading(false);
     }
-  }, [renamePrompt, story.id, activeChapterId]);
+  }, [cascadePrompt, story.id, activeChapterId, presentNextCascadePrompt]);
+
+  const dismissCharacterCascade = useCallback(() => {
+    cascadeQueueRef.current = [];
+    setCascadeQueueCount(0);
+    setCascadePrompt(null);
+  }, []);
 
   const syncRewriteStatesFromDocument = useCallback(() => {
     const editor = editorHandleRef.current;
@@ -616,8 +661,6 @@ export function StoryEngineProvider({
 
     if (changed) setRewriteStates(next);
   }, []);
-
-  const dismissRenamePrompt = useCallback(() => setRenamePrompt(null), []);
 
   const applyPresetRewrite = useCallback(
     (
@@ -950,8 +993,9 @@ export function StoryEngineProvider({
     linkedNames,
     focusMode,
     chaptersLoaded,
-    renamePrompt,
-    cascadeRenameLoading,
+    cascadePrompt,
+    cascadeQueueCount,
+    cascadeSyncLoading,
     rewriteStates,
     customRewriteLoading,
     registerEditor,
@@ -968,8 +1012,8 @@ export function StoryEngineProvider({
     updateChapterMeta,
     setCharacters,
     handleCharacterSaved,
-    confirmRenameInDraft,
-    dismissRenamePrompt,
+    confirmCharacterCascade,
+    dismissCharacterCascade,
     runSelectionSoulCheck,
     runSoulCheck,
     runGhostwrite,

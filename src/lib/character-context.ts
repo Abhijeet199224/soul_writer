@@ -14,6 +14,9 @@ export function formatCharacterContext(characters: Character[]): string {
       const parts = [
         `${character.name} (${character.role})`,
         character.age != null ? `Age ${character.age}` : null,
+        character.pronouns
+          ? `Pronouns: ${character.pronouns}`
+          : null,
         `Flaw: ${character.core_flaw ?? "unspecified"}`,
         `Motivation: ${character.primary_motivation ?? "unspecified"}`,
         character.physical_appearance

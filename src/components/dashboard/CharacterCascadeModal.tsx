@@ -1,22 +1,34 @@
 "use client";
 
-interface RenameConfirmModalProps {
-  oldName: string;
-  newName: string;
+interface CharacterCascadeModalProps {
+  fieldLabel: string;
+  oldText: string;
+  newText: string;
   mentionCount: number;
+  queuedCount?: number;
   loading?: boolean;
   onConfirm: () => void | Promise<void>;
   onDismiss: () => void;
 }
 
-export function RenameConfirmModal({
-  oldName,
-  newName,
+function describeChangeKind(fieldLabel: string) {
+  if (fieldLabel.startsWith("pronoun")) return "pronoun";
+  if (fieldLabel === "character name") return "name";
+  return "attribute phrase";
+}
+
+export function CharacterCascadeModal({
+  fieldLabel,
+  oldText,
+  newText,
   mentionCount,
+  queuedCount = 0,
   loading = false,
   onConfirm,
   onDismiss,
-}: RenameConfirmModalProps) {
+}: CharacterCascadeModalProps) {
+  const changeKind = describeChangeKind(fieldLabel);
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/45 p-4 backdrop-blur-[2px]"
@@ -26,7 +38,7 @@ export function RenameConfirmModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="rename-modal-title"
+        aria-labelledby="cascade-modal-title"
         className="w-full max-w-md rounded-2xl border border-amber-200 bg-white p-6 shadow-2xl shadow-stone-900/15"
         onClick={(event) => event.stopPropagation()}
       >
@@ -34,18 +46,25 @@ export function RenameConfirmModal({
           Living lore sync
         </p>
         <h2
-          id="rename-modal-title"
+          id="cascade-modal-title"
           className="mt-2 font-serif text-xl text-stone-900"
         >
-          Update character name across your manuscript?
+          Update {fieldLabel} across your manuscript?
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-stone-600">
           Change all {mentionCount} mention{mentionCount === 1 ? "" : "s"} of{" "}
-          <strong className="text-stone-900">{oldName}</strong> to{" "}
-          <strong className="text-amber-900">{newName}</strong> in every Act and
-          chapter? Background storage updates immediately, and the open canvas
-          uses TipTap transactions — Ctrl+Z can revert the active chapter.
+          <strong className="text-stone-900">{oldText}</strong> to{" "}
+          <strong className="text-amber-900">{newText}</strong> in every Act and
+          chapter? Background storage updates immediately for this {changeKind},
+          and the open canvas uses TipTap transactions — Ctrl+Z can revert the
+          active chapter.
         </p>
+        {queuedCount > 0 && (
+          <p className="mt-2 text-xs text-stone-500">
+            {queuedCount} more character update
+            {queuedCount === 1 ? "" : "s"} queued after this one.
+          </p>
+        )}
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button
             type="button"
