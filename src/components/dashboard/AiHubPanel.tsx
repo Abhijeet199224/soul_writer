@@ -174,11 +174,11 @@ function SoulCheckInsightCard({
       {tones && (
         <div className="mt-4 space-y-2">
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500">
-            Quick-start tone ideas
+            Inspirational tone presets
           </p>
           <p className="text-[10px] text-stone-400">
-            Presets are starting points — try a custom directive below for
-            anything else.
+            Quick-start ideas — use the custom field below for any style you
+            want.
           </p>
           <div className="flex flex-col gap-2">
             {(
@@ -206,40 +206,40 @@ function SoulCheckInsightCard({
                 </button>
               ))}
           </div>
-
-          <form
-            className="pt-1"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!customPrompt.trim() || customLoading) return;
-              onCustomRewrite(index, insight.targetText, customPrompt);
-              setCustomPrompt("");
-            }}
-          >
-            <label
-              htmlFor={`custom-tone-${index}`}
-              className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500"
-            >
-              ✨ Adjust this text to any custom tone…
-            </label>
-            <input
-              id={`custom-tone-${index}`}
-              type="text"
-              value={customPrompt}
-              onChange={(event) => setCustomPrompt(event.target.value)}
-              disabled={customLoading}
-              placeholder='e.g. "Make it sound highly cynical" or "Write it in the style of Ernest Hemingway"'
-              title="Describe any tone or style — press Enter to rewrite this sentence on the canvas"
-              className="mt-1.5 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-amber-400 disabled:opacity-60"
-            />
-            {customLoading && (
-              <p className="mt-1.5 text-[10px] text-amber-700">
-                Crafting your custom rewrite…
-              </p>
-            )}
-          </form>
         </div>
       )}
+
+      <form
+        className="mt-4 border-t border-stone-100 pt-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!customPrompt.trim() || customLoading) return;
+          onCustomRewrite(index, insight.targetText, customPrompt);
+          setCustomPrompt("");
+        }}
+      >
+        <label
+          htmlFor={`custom-tone-${index}`}
+          className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500"
+        >
+          ✨ Adjust to any custom tone/style…
+        </label>
+        <input
+          id={`custom-tone-${index}`}
+          type="text"
+          value={customPrompt}
+          onChange={(event) => setCustomPrompt(event.target.value)}
+          disabled={customLoading}
+          placeholder='e.g. "Make it more sarcastic", "Write it like Hemingway", "Infuse dread"'
+          title="Describe any tone or style — press Enter to rewrite this sentence on the canvas"
+          className="mt-1.5 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-amber-400 disabled:opacity-60"
+        />
+        {customLoading && (
+          <p className="mt-1.5 text-[10px] text-amber-700">
+            Crafting your custom rewrite…
+          </p>
+        )}
+      </form>
     </article>
   );
 }
@@ -281,7 +281,7 @@ export function AiHubPanel() {
 
   if (engine.aiHubCollapsed) {
     return (
-      <aside className="flex w-12 shrink-0 flex-col items-center border-l border-stone-200 bg-white py-4 transition-all duration-300 ease-in-out">
+      <aside className="flex w-12 shrink-0 flex-col items-center overflow-hidden border-l border-stone-200 bg-white py-4 transition-all duration-300 ease-in-out">
         <button
           type="button"
           onClick={() => engine.setAiHubCollapsed(false)}
@@ -295,7 +295,7 @@ export function AiHubPanel() {
   }
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-l border-stone-200 bg-white transition-all duration-300 ease-in-out xl:w-96">
+    <aside className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-stone-200 bg-white transition-all duration-300 ease-in-out xl:w-96">
       <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-700">
           AI Hub

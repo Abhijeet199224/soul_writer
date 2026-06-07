@@ -14,6 +14,9 @@ interface AiRequestBody {
   beat?: string;
   chapterId?: string;
   cursorPrefix?: string;
+  plotObjectives?: string;
+  activePlotBeatTitle?: string;
+  settingNotes?: string;
 }
 
 export async function POST(request: Request) {
@@ -33,7 +36,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { storyId, mode, draft, beat, chapterId, cursorPrefix } = body;
+  const { storyId, mode, draft, beat, chapterId, cursorPrefix, plotObjectives, activePlotBeatTitle, settingNotes } = body;
   const sliderValue = Math.min(100, Math.max(0, body.sliderValue ?? 50));
   const ghostwriteTier = getGhostwriteTier(sliderValue);
 
@@ -82,12 +85,48 @@ export async function POST(request: Request) {
     ? { ...bible, sceneBeat: beat.trim() }
     : bible;
 
+  const bibleWithSession = {
+    ...bibleWithBeat,
+    settingNotes: settingNotes?.trim() || bibleWithBeat.settingNotes,
+    chapter: bibleWithBeat.chapter
+      ? {
+          ...bibleWithBeat.chapter,
+          plot_objectives:
+            plotObjectives?.trim() ||
+            bibleWithBeat.chapter.plot_objectives ||
+            "",
+          scene_beat: beat?.trim() || bibleWithBeat.chapter.scene_beat || "",
+        }
+      : bibleWithBeat.chapter,
+  };
+
+  const sceneBeatLine = [
+    beat?.trim() ? `Active scene beat: ${beat.trim()}` : null,
+    activePlotBeatTitle?.trim()
+      ? `Focused plot beat: ${activePlotBeatTitle.trim()}`
+      : null,
+    plotObjectives?.trim()
+      ? `Chapter plot objectives: ${plotObjectives.trim()}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const bibleForPrompt = sceneBeatLine
+    ? {
+        ...bibleWithSession,
+        sceneBeat: [bibleWithSession.sceneBeat, sceneBeatLine]
+          .filter(Boolean)
+          .join("\n"),
+      }
+    : bibleWithSession;
+
   try {
     const result = await generateWithGemini(
       {
         storyTitle: story.title,
-        bible: bibleWithBeat,
-        chapter: bible.chapter,
+        bible: bibleForPrompt,
+        chapter: bibleForPrompt.chapter,
         sliderValue,
         ghostwriteTier: mode === "ghostwrite" ? ghostwriteTier : undefined,
         draftContent: draft,

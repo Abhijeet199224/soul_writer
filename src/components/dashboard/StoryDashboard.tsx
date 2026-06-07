@@ -9,6 +9,7 @@ import {
 import { NavigatorPanel } from "./NavigatorPanel";
 import { WritingCanvas } from "./WritingCanvas";
 import { AiHubPanel } from "./AiHubPanel";
+import { RenameConfirmModal } from "./RenameConfirmModal";
 
 interface StoryDashboardProps {
   story: Story;
@@ -39,30 +40,13 @@ function StoryDashboardShell() {
       </div>
 
       {engine.renamePrompt && (
-        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-950">
-          <p>
-            Update all {engine.renamePrompt.mentionCount} mention
-            {engine.renamePrompt.mentionCount === 1 ? "" : "s"} of{" "}
-            <strong>{engine.renamePrompt.oldName}</strong> to{" "}
-            <strong>{engine.renamePrompt.newName}</strong> in this chapter?
-          </p>
-          <div className="flex shrink-0 gap-2">
-            <button
-              type="button"
-              onClick={engine.dismissRenamePrompt}
-              className="rounded-lg border border-amber-300 px-3 py-1 text-xs hover:bg-white"
-            >
-              No
-            </button>
-            <button
-              type="button"
-              onClick={engine.confirmRenameInDraft}
-              className="rounded-lg bg-amber-700 px-3 py-1 text-xs font-medium text-white hover:bg-amber-800"
-            >
-              Yes
-            </button>
-          </div>
-        </div>
+        <RenameConfirmModal
+          oldName={engine.renamePrompt.oldName}
+          newName={engine.renamePrompt.newName}
+          mentionCount={engine.renamePrompt.mentionCount}
+          onConfirm={engine.confirmRenameInDraft}
+          onDismiss={engine.dismissRenamePrompt}
+        />
       )}
 
       <div className="flex min-h-0 flex-1 overflow-hidden transition-all duration-300 ease-in-out">
