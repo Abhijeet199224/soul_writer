@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useStoryEngine } from "@/context/StoryEngineContext";
 import { getGhostwriteTier } from "@/lib/chapters";
@@ -35,13 +36,23 @@ export function WritingCanvas() {
     updateDraft,
     setBeat,
     setSliderValue,
+    setChapterTitle,
+    chapterTitleFocusToken,
     onHighlightInsight,
     runSelectionSoulCheck,
     registerEditor,
     syncRewriteStatesFromDocument,
+    isProcessingLargeContent,
   } = useStoryEngine();
 
+  const chapterTitleRef = useRef<HTMLInputElement>(null);
   const ghostTier = getGhostwriteTier(sliderValue);
+
+  useEffect(() => {
+    if (!chapterTitleFocusToken) return;
+    chapterTitleRef.current?.focus();
+    chapterTitleRef.current?.select();
+  }, [chapterTitleFocusToken]);
 
   return (
     <section
@@ -51,7 +62,7 @@ export function WritingCanvas() {
     >
       <header className="shrink-0 border-b border-stone-200 bg-white/95 px-6 py-4 backdrop-blur-sm">
         <div className="mx-auto flex max-w-5xl items-start justify-between gap-4">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate font-serif text-xl tracking-tight text-stone-900">
               {story.title}
             </p>
@@ -60,9 +71,15 @@ export function WritingCanvas() {
                 <p className="mt-0.5 truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">
                   {activeChapter.act}
                 </p>
-                <p className="truncate font-serif text-sm text-stone-600">
-                  {activeChapter.title}
-                </p>
+                <input
+                  ref={chapterTitleRef}
+                  type="text"
+                  value={activeChapter.title}
+                  onChange={(event) => setChapterTitle(event.target.value)}
+                  placeholder="Chapter title…"
+                  title="Chapter title — auto-focused when you add a new Act"
+                  className="mt-1 w-full truncate border-b border-transparent bg-transparent font-serif text-sm text-stone-700 outline-none transition placeholder:text-stone-400 focus:border-amber-300"
+                />
               </>
             )}
           </div>
@@ -119,6 +136,11 @@ export function WritingCanvas() {
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-5 md:p-6">
         <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col">
+          {isProcessingLargeContent && (
+            <p className="mb-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-stone-500">
+              Processing a large paste — saving will continue in the background…
+            </p>
+          )}
           <TipTapEditor
             onEditorReady={registerEditor}
             documentKey={activeChapterId}

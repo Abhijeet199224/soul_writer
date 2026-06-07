@@ -71,6 +71,57 @@ export function clearSoulCheckHighlights(editor: Editor): void {
   editor.view.dispatch(tr);
 }
 
+/** Remove soul-check highlight marks for one insight index. */
+export function clearInsightHighlight(
+  editor: Editor,
+  insightIndex: number,
+): void {
+  const highlightMark = editor.schema.marks.highlight;
+  if (!highlightMark) return;
+
+  let { tr } = editor.state;
+  const indexKey = String(insightIndex);
+
+  editor.state.doc.descendants((node, pos) => {
+    if (!node.isText || !node.text) return;
+    for (const mark of node.marks) {
+      if (
+        mark.type.name === "highlight" &&
+        String(mark.attrs.insightIndex) === indexKey
+      ) {
+        tr = tr.removeMark(pos, pos + node.text.length, highlightMark);
+      }
+    }
+  });
+
+  tr.setMeta("addToHistory", false);
+  editor.view.dispatch(tr);
+}
+
+/** Remove soul-check highlights covering a target sentence (any insight index). */
+export function clearHighlightForTargetText(
+  editor: Editor,
+  targetText: string,
+): void {
+  const highlightMark = editor.schema.marks.highlight;
+  if (!highlightMark) return;
+
+  const needle = targetText.trim();
+  if (!needle) return;
+
+  const ranges = findTextRangesInDoc(editor.state.doc, needle);
+  if (!ranges.length) return;
+
+  let { tr } = editor.state;
+
+  for (const { from, to } of ranges) {
+    tr = tr.removeMark(from, to, highlightMark);
+  }
+
+  tr.setMeta("addToHistory", false);
+  editor.view.dispatch(tr);
+}
+
 export function applySoulCheckHighlights(
   editor: Editor,
   insights: SoulCheckInsight[],

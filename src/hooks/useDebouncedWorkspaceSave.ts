@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SaveStatus } from "@/lib/types";
 
 const DRAFT_DEBOUNCE_MS = 1500;
+const LARGE_DRAFT_DEBOUNCE_MS = 3500;
 const META_DEBOUNCE_MS = 600;
+const LARGE_DRAFT_CHAR_THRESHOLD = 50_000;
+const MAX_DRAFT_SAVE_CHARS = 500_000;
 
 export interface ChapterSaveSnapshot {
   chapterId: string;
@@ -65,6 +68,11 @@ export function useDebouncedChapterSave({
       return;
     }
 
+    if (chapter.draftContent.length > MAX_DRAFT_SAVE_CHARS) {
+      setSaveStatus("error");
+      return;
+    }
+
     setSaveStatus("saving");
 
     try {
@@ -113,7 +121,12 @@ export function useDebouncedChapterSave({
 
     const draftChanged =
       chapterSnapshot.draftContent !== lastDraftRef.current;
-    const delay = draftChanged ? DRAFT_DEBOUNCE_MS : META_DEBOUNCE_MS;
+    const draftSize = chapterSnapshot.draftContent.length;
+    let delay = draftChanged ? DRAFT_DEBOUNCE_MS : META_DEBOUNCE_MS;
+
+    if (draftChanged && draftSize > LARGE_DRAFT_CHAR_THRESHOLD) {
+      delay = LARGE_DRAFT_DEBOUNCE_MS;
+    }
 
     setSaveStatus((current) => (current === "saving" ? current : "idle"));
 

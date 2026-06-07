@@ -23,6 +23,8 @@ export function NavigatorPanel() {
     switchChapter,
     selectPlotBeat,
     chaptersLoaded,
+    addChapter,
+    addingChapter,
     characters,
     handleCharacterSaved,
     setCharacters,
@@ -207,6 +209,20 @@ export function NavigatorPanel() {
                 />
               </div>
             )}
+          </div>
+        )}
+
+        {section === "chapters" && chaptersLoaded && (
+          <div className="mt-3 border-t border-stone-100 pt-3">
+            <button
+              type="button"
+              onClick={() => void addChapter()}
+              disabled={addingChapter}
+              title="Create a new Act/Chapter workspace with an empty canvas"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-amber-300 bg-amber-50/60 px-3 py-3 text-sm font-medium text-amber-900 transition hover:border-amber-400 hover:bg-amber-50 disabled:opacity-60"
+            >
+              {addingChapter ? "Creating chapter…" : "+ Add Chapter / Act"}
+            </button>
           </div>
         )}
 

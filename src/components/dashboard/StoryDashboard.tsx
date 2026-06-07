@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import type { Character, Story, StoryWorkspace } from "@/lib/types";
 import {
   StoryEngineProvider,
@@ -10,6 +11,7 @@ import { NavigatorPanel } from "./NavigatorPanel";
 import { WritingCanvas } from "./WritingCanvas";
 import { AiHubPanel } from "./AiHubPanel";
 import { RenameConfirmModal } from "./RenameConfirmModal";
+import { SmartCodexDrawer } from "./SmartCodexDrawer";
 
 interface StoryDashboardProps {
   story: Story;
@@ -19,6 +21,17 @@ interface StoryDashboardProps {
 
 function StoryDashboardShell() {
   const engine = useStoryEngine();
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.shiftKey && event.key.toLowerCase() === "c") {
+        event.preventDefault();
+        engine.setCodexOpen(!engine.codexOpen);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [engine]);
 
   return (
     <div className="flex h-[calc(100dvh-57px)] flex-col">
@@ -54,6 +67,8 @@ function StoryDashboardShell() {
         <WritingCanvas />
         <AiHubPanel />
       </div>
+
+      <SmartCodexDrawer />
     </div>
   );
 }
