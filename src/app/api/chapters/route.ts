@@ -128,6 +128,7 @@ export async function POST(request: Request) {
       activeChapterId?: string;
       settingNotes?: string;
       sliderValue?: number;
+      expectedUpdatedAt?: string;
     };
 
     if (!storyId) {
@@ -146,6 +147,28 @@ export async function POST(request: Request) {
     }
 
     if (chapterId) {
+      if (body.expectedUpdatedAt) {
+        const { data: currentChapter } = await supabase
+          .from("story_chapters")
+          .select("updated_at")
+          .eq("id", chapterId)
+          .eq("story_id", storyId)
+          .single();
+
+        if (
+          currentChapter?.updated_at &&
+          currentChapter.updated_at !== body.expectedUpdatedAt
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "This chapter was updated elsewhere. Reload the story to avoid overwriting changes.",
+            },
+            { status: 409 },
+          );
+        }
+      }
+
       const chapterRow: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
       };

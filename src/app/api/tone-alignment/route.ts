@@ -21,6 +21,7 @@ export async function POST(request: Request) {
     const draft = String(body.draft ?? "").trim();
     const chapterId = body.chapterId ? String(body.chapterId) : undefined;
     const settingNotes = String(body.settingNotes ?? "").trim();
+    const characterId = body.characterId ? String(body.characterId) : undefined;
 
     if (!storyId) {
       return NextResponse.json({ error: "storyId is required" }, { status: 400 });
@@ -53,9 +54,14 @@ export async function POST(request: Request) {
     }
 
     const charactersUsed = getCharactersUsedInText(draft, bible.characters);
-    const relevant = bible.characters.filter((c) =>
+    let relevant = bible.characters.filter((c) =>
       charactersUsed.includes(c.name),
     );
+
+    if (characterId) {
+      const scoped = bible.characters.find((c) => c.id === characterId);
+      relevant = scoped ? [scoped] : relevant;
+    }
 
     const prompt = `You are a developmental editor verifying character voice alignment in Soul Writer.
 

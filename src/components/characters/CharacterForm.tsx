@@ -6,13 +6,18 @@ import {
   CHARACTER_ROLES,
   type Character,
   type CharacterInput,
+  type CharacterRelationship,
   type CharacterRole,
 } from "@/lib/types";
 
 interface CharacterFormProps {
   storyId: string;
   character?: Character;
-  onSaved: (character: Character, previous?: Character) => void;
+  onSaved: (
+    character: Character,
+    previous?: Character,
+    options?: { includeAgeCascade?: boolean },
+  ) => void;
   onCancel?: () => void;
 }
 
@@ -21,10 +26,37 @@ const emptyForm: CharacterInput = {
   role: "Protagonist",
   age: null,
   pronouns: "",
+  aliases: "",
+  voice_notes: "",
+  relationships: [],
   physical_appearance: "",
   core_flaw: "",
   primary_motivation: "",
 };
+
+function formatRelationships(
+  relationships: CharacterRelationship[] | null | undefined,
+): string {
+  if (!relationships?.length) return "";
+  return relationships
+    .map((item) => `${item.character_name}: ${item.relationship}`)
+    .join("\n");
+}
+
+function parseRelationships(text: string): CharacterRelationship[] {
+  return text
+    .split(/\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [name, ...rest] = line.split(":");
+      return {
+        character_name: name?.trim() ?? "",
+        relationship: rest.join(":").trim(),
+      };
+    })
+    .filter((item) => item.character_name && item.relationship);
+}
 
 export function CharacterForm({
   storyId,
@@ -39,12 +71,19 @@ export function CharacterForm({
           role: character.role,
           age: character.age,
           pronouns: character.pronouns ?? "",
+          aliases: character.aliases ?? "",
+          voice_notes: character.voice_notes ?? "",
+          relationships: character.relationships ?? [],
           physical_appearance: character.physical_appearance ?? "",
           core_flaw: character.core_flaw ?? "",
           primary_motivation: character.primary_motivation ?? "",
         }
       : emptyForm,
   );
+  const [relationshipsText, setRelationshipsText] = useState(
+    formatRelationships(character?.relationships),
+  );
+  const [includeAgeCascade, setIncludeAgeCascade] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +105,9 @@ export function CharacterForm({
       role: form.role,
       age: form.age,
       pronouns: form.pronouns?.trim() || null,
+      aliases: form.aliases?.trim() || null,
+      voice_notes: form.voice_notes?.trim() || null,
+      relationships: parseRelationships(relationshipsText),
       physical_appearance: form.physical_appearance?.trim() || null,
       core_flaw: form.core_flaw?.trim() || null,
       primary_motivation: form.primary_motivation?.trim() || null,
@@ -88,12 +130,18 @@ export function CharacterForm({
       return;
     }
 
-    onSaved(data as Character, character);
+    onSaved(data as Character, character, {
+      includeAgeCascade,
+    });
     if (!character) {
       setForm(emptyForm);
+      setRelationshipsText("");
     }
     setLoading(false);
   }
+
+  const ageChanged =
+    Boolean(character) && character?.age != null && character.age !== form.age;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -108,6 +156,18 @@ export function CharacterForm({
             onChange={(e) => updateField("name", e.target.value)}
             className="w-full rounded-xl border border-stone-200 px-4 py-3 outline-none focus:border-amber-400"
             placeholder="Julian"
+          />
+        </label>
+
+        <label className="block sm:col-span-1">
+          <span className="mb-1 block text-sm font-medium text-stone-700">
+            Aliases
+          </span>
+          <input
+            value={form.aliases ?? ""}
+            onChange={(e) => updateField("aliases", e.target.value)}
+            className="w-full rounded-xl border border-stone-200 px-4 py-3 outline-none focus:border-amber-400"
+            placeholder="Jules, Jay"
           />
         </label>
 
@@ -161,6 +221,47 @@ export function CharacterForm({
           />
         </label>
       </div>
+
+      {ageChanged && (
+        <label className="flex items-start gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
+          <input
+            type="checkbox"
+            checked={includeAgeCascade}
+            onChange={(event) => setIncludeAgeCascade(event.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            Also cascade prefixed age references like “Age {character?.age}” → “Age{" "}
+            {form.age}” across the manuscript.
+          </span>
+        </label>
+      )}
+
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium text-stone-700">
+          Voice notes
+        </span>
+        <textarea
+          value={form.voice_notes ?? ""}
+          onChange={(e) => updateField("voice_notes", e.target.value)}
+          rows={2}
+          className="w-full rounded-xl border border-stone-200 px-4 py-3 outline-none focus:border-amber-400"
+          placeholder="Dry wit, short sentences, avoids contractions when nervous..."
+        />
+      </label>
+
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium text-stone-700">
+          Relationships
+        </span>
+        <textarea
+          value={relationshipsText}
+          onChange={(e) => setRelationshipsText(e.target.value)}
+          rows={2}
+          className="w-full rounded-xl border border-stone-200 px-4 py-3 outline-none focus:border-amber-400"
+          placeholder={"Elena: estranged sister\nMarcus: former partner"}
+        />
+      </label>
 
       <label className="block">
         <span className="mb-1 block text-sm font-medium text-stone-700">

@@ -43,6 +43,7 @@ export function WritingCanvas() {
     registerEditor,
     syncRewriteStatesFromDocument,
     isProcessingLargeContent,
+    editorExternalSyncPaused,
   } = useStoryEngine();
 
   const chapterTitleRef = useRef<HTMLInputElement>(null);
@@ -153,6 +154,7 @@ export function WritingCanvas() {
             onHighlightInsight={onHighlightInsight}
             onSelectionSoulCheck={(text) => void runSelectionSoulCheck(text)}
             selectionLoading={selectionLoading}
+            externalSyncPaused={editorExternalSyncPaused}
             placeholder="Write this chapter. Character names underline in Smart Codex — hover for traits. Select text for Soul Check…"
           />
         </div>

@@ -1,6 +1,7 @@
 import { createDocument } from "@tiptap/core";
 import type { Editor } from "@tiptap/react";
 import { normalizeDraftContent } from "@/lib/draft-content";
+import { preserveReplacementCase } from "@/lib/character-attribute-sync";
 
 export function getCursorPrefixFromEditor(editor: Editor | null): string {
   if (!editor) return "";
@@ -169,7 +170,10 @@ export function replaceAllTextInEditor(
     .command(({ tr, dispatch }) => {
       const sorted = [...ranges].sort((a, b) => b.from - a.from);
       for (const { from, to } of sorted) {
-        const slice = editor.schema.text(trimmed);
+        const matched = editor.state.doc.textBetween(from, to, "");
+        const slice = editor.schema.text(
+          preserveReplacementCase(matched, trimmed),
+        );
         tr.replaceWith(from, to, slice);
       }
       if (dispatch) dispatch(tr);

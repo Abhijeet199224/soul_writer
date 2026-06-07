@@ -23,7 +23,19 @@ import { countTextMentionsAcrossChapters } from "@/lib/manuscript-cascade";
 import {
   detectCharacterTextChanges,
   type CascadeMatchMode,
+  type CharacterTextChange,
 } from "@/lib/character-attribute-sync";
+import {
+  buildCascadeChapterPreviews,
+  buildManuscriptSnapshot,
+  downloadManuscriptSnapshot,
+  getPronounCascadeWarnings,
+  type CascadeChapterPreview,
+} from "@/lib/cascade-preview";
+import {
+  enqueueCascadeRetry,
+  flushCascadeRetryQueue,
+} from "@/lib/cascade-retry-queue";
 import type {
   GhostwriteAiResult,
   SoulCheckAiResult,
@@ -43,6 +55,16 @@ interface CharacterCascadePrompt {
   newText: string;
   mentionCount: number;
   matchMode: CascadeMatchMode;
+  characterId?: string;
+  characterName?: string;
+  previews: CascadeChapterPreview[];
+  warnings: string[];
+  excludedChapterIds: string[];
+}
+
+interface CharacterDeletePrompt {
+  character: Character;
+  mentionCount: number;
 }
 
 export interface InsightRewriteState {
@@ -89,6 +111,11 @@ interface StoryEngineContextValue {
   cascadePrompt: CharacterCascadePrompt | null;
   cascadeQueueCount: number;
   cascadeSyncLoading: boolean;
+  deletePrompt: CharacterDeletePrompt | null;
+  deleteCharacterLoading: boolean;
+  editorExternalSyncPaused: boolean;
+  toneAlignmentCharacterId: string | null;
+  setToneAlignmentCharacterId: (id: string | null) => void;
   rewriteStates: Record<number, InsightRewriteState>;
   customRewriteLoading: number | null;
   registerEditor: (handle: TipTapEditorHandle | null) => void;
@@ -104,9 +131,19 @@ interface StoryEngineContextValue {
   setSettingNotes: (notes: string) => void;
   updateChapterMeta: (updates: Partial<StoryChapter>) => void;
   setCharacters: (characters: Character[]) => void;
-  handleCharacterSaved: (character: Character, previous?: Character) => void;
+  handleCharacterSaved: (
+    character: Character,
+    previous?: Character,
+    options?: { includeAgeCascade?: boolean },
+  ) => void;
   confirmCharacterCascade: () => Promise<void>;
+  skipCharacterCascade: () => void;
   dismissCharacterCascade: () => void;
+  toggleCascadeChapterExclusion: (chapterId: string) => void;
+  exportCascadeSnapshot: () => void;
+  requestCharacterDelete: (character: Character) => void;
+  confirmCharacterDelete: (mode: "remove" | "placeholder" | "codex") => Promise<void>;
+  dismissCharacterDelete: () => void;
   runSelectionSoulCheck: (selectedText: string) => Promise<void>;
   runSoulCheck: () => Promise<void>;
   runGhostwrite: () => Promise<void>;
@@ -194,6 +231,14 @@ export function StoryEngineProvider({
   const [cascadeQueueCount, setCascadeQueueCount] = useState(0);
   const [cascadeSyncLoading, setCascadeSyncLoading] = useState(false);
   const cascadeQueueRef = useRef<CharacterCascadePrompt[]>([]);
+  const [deletePrompt, setDeletePrompt] = useState<CharacterDeletePrompt | null>(
+    null,
+  );
+  const [deleteCharacterLoading, setDeleteCharacterLoading] = useState(false);
+  const [editorExternalSyncPaused, setEditorExternalSyncPaused] = useState(false);
+  const [toneAlignmentCharacterId, setToneAlignmentCharacterId] = useState<
+    string | null
+  >(null);
   const [rewriteStates, setRewriteStates] = useState<
     Record<number, InsightRewriteState>
   >({});
@@ -266,8 +311,15 @@ export function StoryEngineProvider({
       draftContent: draft,
       sceneBeat: beat,
       plotObjectives: activeChapter?.plot_objectives,
+      expectedUpdatedAt: activeChapter?.updated_at ?? null,
     }),
-    [activeChapter?.id, activeChapter?.plot_objectives, draft, beat],
+    [
+      activeChapter?.id,
+      activeChapter?.plot_objectives,
+      activeChapter?.updated_at,
+      draft,
+      beat,
+    ],
   );
 
   const metaSnapshot = useMemo(
@@ -475,6 +527,16 @@ export function StoryEngineProvider({
     [soulCheckResult, activeInsightIndex],
   );
 
+  useEffect(() => {
+    if (!chaptersLoaded) return;
+    void flushCascadeRetryQueue(story.id);
+    function onOnline() {
+      void flushCascadeRetryQueue(story.id);
+    }
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [chaptersLoaded, story.id]);
+
   const runToneAlignmentCheck = useCallback(async () => {
     if (!plainDraft.trim()) {
       setToneAlignmentReport(
@@ -495,6 +557,7 @@ export function StoryEngineProvider({
           draft: plainDraft,
           chapterId: activeChapterId,
           settingNotes,
+          characterId: toneAlignmentCharacterId,
         }),
       });
       const data = await response.json();
@@ -509,12 +572,53 @@ export function StoryEngineProvider({
     } finally {
       setToneAlignmentLoading(false);
     }
-  }, [story.id, plainDraft, activeChapterId, settingNotes]);
+  }, [story.id, plainDraft, activeChapterId, settingNotes, toneAlignmentCharacterId]);
+
+  const buildCascadePrompt = useCallback(
+    (
+      change: CharacterTextChange,
+      character: Character,
+      excludedChapterIds: string[] = [],
+    ): CharacterCascadePrompt | null => {
+      const previews = buildCascadeChapterPreviews(
+        chapters,
+        change.oldText,
+        change.newText,
+        change.matchMode,
+        excludedChapterIds,
+      );
+      const mentionCount = previews.reduce(
+        (sum, preview) => sum + preview.mentionsReplaced,
+        0,
+      );
+      if (mentionCount === 0) return null;
+
+      const warnings =
+        change.field === "pronouns" && character.name
+          ? getPronounCascadeWarnings(chapters, change.oldText, character.name)
+          : [];
+
+      return {
+        fieldLabel: change.fieldLabel,
+        oldText: change.oldText,
+        newText: change.newText,
+        matchMode: change.matchMode,
+        mentionCount,
+        characterId: character.id,
+        characterName: character.name,
+        previews,
+        warnings,
+        excludedChapterIds,
+      };
+    },
+    [chapters],
+  );
 
   const presentNextCascadePrompt = useCallback(() => {
     const next = cascadeQueueRef.current.shift() ?? null;
     setCascadeQueueCount(cascadeQueueRef.current.length);
     setCascadePrompt(next);
+    setEditorExternalSyncPaused(Boolean(next));
   }, []);
 
   const enqueueCascadePrompts = useCallback(
@@ -531,12 +635,17 @@ export function StoryEngineProvider({
       cascadeQueueRef.current = rest;
       setCascadeQueueCount(rest.length);
       setCascadePrompt(first);
+      setEditorExternalSyncPaused(true);
     },
     [cascadePrompt],
   );
 
   const handleCharacterSaved = useCallback(
-    (character: Character, previous?: Character) => {
+    (
+      character: Character,
+      previous?: Character,
+      options?: { includeAgeCascade?: boolean },
+    ) => {
       setCharacters((prev) => {
         const exists = prev.some((c) => c.id === character.id);
         const next = exists
@@ -547,32 +656,65 @@ export function StoryEngineProvider({
 
       if (!previous) return;
 
-      const prompts = detectCharacterTextChanges(previous, character)
-        .map((change) => ({
-          fieldLabel: change.fieldLabel,
-          oldText: change.oldText,
-          newText: change.newText,
-          matchMode: change.matchMode,
-          mentionCount: countTextMentionsAcrossChapters(
-            chapters,
-            change.oldText,
-            change.matchMode,
-          ),
-        }))
-        .filter((prompt) => prompt.mentionCount > 0)
+      const prompts = detectCharacterTextChanges(previous, character, {
+        includeAgeCascade: options?.includeAgeCascade,
+      })
+        .map((change) => buildCascadePrompt(change, character))
+        .filter((prompt): prompt is CharacterCascadePrompt => prompt !== null)
         .sort((a, b) => b.mentionCount - a.mentionCount);
 
       enqueueCascadePrompts(prompts);
     },
-    [chapters, enqueueCascadePrompts],
+    [buildCascadePrompt, enqueueCascadePrompts],
   );
+
+  const toggleCascadeChapterExclusion = useCallback((chapterId: string) => {
+    setCascadePrompt((current) => {
+      if (!current) return current;
+      const excluded = new Set(current.excludedChapterIds);
+      if (excluded.has(chapterId)) excluded.delete(chapterId);
+      else excluded.add(chapterId);
+
+      const previews = buildCascadeChapterPreviews(
+        chapters,
+        current.oldText,
+        current.newText,
+        current.matchMode,
+        [...excluded],
+      );
+
+      return {
+        ...current,
+        excludedChapterIds: [...excluded],
+        previews,
+        mentionCount: previews.reduce(
+          (sum, preview) => sum + preview.mentionsReplaced,
+          0,
+        ),
+      };
+    });
+  }, [chapters]);
+
+  const exportCascadeSnapshot = useCallback(() => {
+    downloadManuscriptSnapshot(
+      buildManuscriptSnapshot(
+        story.id,
+        story.title,
+        chapters,
+        cascadePrompt
+          ? `Pre-cascade: ${cascadePrompt.fieldLabel}`
+          : "Manual backup",
+      ),
+    );
+  }, [story.id, story.title, chapters, cascadePrompt]);
 
   const confirmCharacterCascade = useCallback(async () => {
     if (!cascadePrompt) return;
 
-    const { oldText, newText, matchMode } = cascadePrompt;
+    const { oldText, newText, matchMode, excludedChapterIds } = cascadePrompt;
     setCascadeSyncLoading(true);
     setInlineNotice(null);
+    setEditorExternalSyncPaused(true);
 
     try {
       const res = await fetch("/api/characters/cascade-text", {
@@ -583,6 +725,7 @@ export function StoryEngineProvider({
           oldText,
           newText,
           matchMode,
+          excludeChapterIds: excludedChapterIds,
         }),
       });
 
@@ -614,24 +757,128 @@ export function StoryEngineProvider({
         editorHandleRef.current?.replaceAllText(oldText, newText, matchMode);
       }
 
+      setSoulCheckResult(null);
+      setActiveInsightIndex(null);
+      clearRewriteStates();
       presentNextCascadePrompt();
     } catch (err) {
       console.error("[cascade-text]", err);
+      enqueueCascadeRetry({
+        storyId: story.id,
+        oldText,
+        newText,
+        matchMode,
+        excludeChapterIds: excludedChapterIds,
+      });
       setInlineNotice(
         err instanceof Error
-          ? err.message
-          : "Could not sync character update across manuscript.",
+          ? `${err.message} — queued for retry when back online.`
+          : "Could not sync character update. Queued for retry.",
       );
     } finally {
       setCascadeSyncLoading(false);
     }
-  }, [cascadePrompt, story.id, activeChapterId, presentNextCascadePrompt]);
+  }, [
+    cascadePrompt,
+    story.id,
+    activeChapterId,
+    presentNextCascadePrompt,
+    clearRewriteStates,
+  ]);
+
+  const skipCharacterCascade = useCallback(() => {
+    presentNextCascadePrompt();
+  }, [presentNextCascadePrompt]);
 
   const dismissCharacterCascade = useCallback(() => {
     cascadeQueueRef.current = [];
     setCascadeQueueCount(0);
     setCascadePrompt(null);
+    setEditorExternalSyncPaused(false);
   }, []);
+
+  const requestCharacterDelete = useCallback(
+    (character: Character) => {
+      const mentionCount = countTextMentionsAcrossChapters(
+        chapters,
+        character.name,
+        "word",
+      );
+      setDeletePrompt({ character, mentionCount });
+    },
+    [chapters],
+  );
+
+  const dismissCharacterDelete = useCallback(() => {
+    setDeletePrompt(null);
+  }, []);
+
+  const confirmCharacterDelete = useCallback(
+    async (mode: "remove" | "placeholder" | "codex") => {
+      if (!deletePrompt) return;
+      const { character } = deletePrompt;
+      setDeleteCharacterLoading(true);
+
+      try {
+        if (mode !== "codex") {
+          const res = await fetch("/api/characters/cascade-delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              storyId: story.id,
+              characterName: character.name,
+              replacement: mode === "placeholder" ? "[removed character]" : "",
+            }),
+          });
+          if (!res.ok) {
+            const err = (await res.json().catch(() => ({}))) as { error?: string };
+            throw new Error(err.error ?? "Failed to update manuscript mentions");
+          }
+
+          const data = (await res.json()) as {
+            chapters: Array<{ id: string; draft_content: string }>;
+          };
+          const patchById = new Map(
+            data.chapters.map((row) => [row.id, row.draft_content]),
+          );
+
+          setChapters((prev) =>
+            prev.map((chapter) => {
+              const patched = patchById.get(chapter.id);
+              if (!patched || chapter.id === activeChapterId) return chapter;
+              return { ...chapter, draft_content: patched };
+            }),
+          );
+
+          if (activeChapterId && patchById.has(activeChapterId)) {
+            editorHandleRef.current?.replaceAllText(
+              character.name,
+              mode === "placeholder" ? "[removed character]" : "",
+              "word",
+            );
+          }
+        }
+
+        const supabase = (await import("@/lib/supabase/client")).createClient();
+        const { error } = await supabase
+          .from("characters")
+          .delete()
+          .eq("id", character.id);
+        if (error) throw new Error(error.message);
+
+        setCharacters((prev) => prev.filter((item) => item.id !== character.id));
+        setDeletePrompt(null);
+        setSoulCheckResult(null);
+      } catch (error) {
+        setInlineNotice(
+          error instanceof Error ? error.message : "Character deletion failed",
+        );
+      } finally {
+        setDeleteCharacterLoading(false);
+      }
+    },
+    [deletePrompt, story.id, activeChapterId],
+  );
 
   const syncRewriteStatesFromDocument = useCallback(() => {
     const editor = editorHandleRef.current;
@@ -996,6 +1243,11 @@ export function StoryEngineProvider({
     cascadePrompt,
     cascadeQueueCount,
     cascadeSyncLoading,
+    deletePrompt,
+    deleteCharacterLoading,
+    editorExternalSyncPaused,
+    toneAlignmentCharacterId,
+    setToneAlignmentCharacterId,
     rewriteStates,
     customRewriteLoading,
     registerEditor,
@@ -1013,7 +1265,13 @@ export function StoryEngineProvider({
     setCharacters,
     handleCharacterSaved,
     confirmCharacterCascade,
+    skipCharacterCascade,
     dismissCharacterCascade,
+    toggleCascadeChapterExclusion,
+    exportCascadeSnapshot,
+    requestCharacterDelete,
+    confirmCharacterDelete,
+    dismissCharacterDelete,
     runSelectionSoulCheck,
     runSoulCheck,
     runGhostwrite,

@@ -11,7 +11,9 @@ import { NavigatorPanel } from "./NavigatorPanel";
 import { WritingCanvas } from "./WritingCanvas";
 import { AiHubPanel } from "./AiHubPanel";
 import { CharacterCascadeModal } from "./CharacterCascadeModal";
+import { CharacterDeleteModal } from "./CharacterDeleteModal";
 import { SmartCodexDrawer } from "./SmartCodexDrawer";
+import { previewActiveChapterDiff } from "@/lib/cascade-preview";
 
 interface StoryDashboardProps {
   story: Story;
@@ -32,6 +34,15 @@ function StoryDashboardShell() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [engine]);
+
+  const activeDiff = engine.cascadePrompt
+    ? previewActiveChapterDiff(
+        engine.activeChapter,
+        engine.cascadePrompt.oldText,
+        engine.cascadePrompt.newText,
+        engine.cascadePrompt.matchMode,
+      )
+    : null;
 
   return (
     <div className="flex h-[calc(100dvh-57px)] flex-col">
@@ -58,10 +69,29 @@ function StoryDashboardShell() {
           oldText={engine.cascadePrompt.oldText}
           newText={engine.cascadePrompt.newText}
           mentionCount={engine.cascadePrompt.mentionCount}
+          previews={engine.cascadePrompt.previews}
+          warnings={engine.cascadePrompt.warnings}
+          excludedChapterIds={engine.cascadePrompt.excludedChapterIds}
+          activeChapterDiff={activeDiff}
           queuedCount={engine.cascadeQueueCount}
           loading={engine.cascadeSyncLoading}
+          onToggleChapter={engine.toggleCascadeChapterExclusion}
+          onExportSnapshot={engine.exportCascadeSnapshot}
+          onSkip={engine.skipCharacterCascade}
+          onCancelAll={engine.dismissCharacterCascade}
           onConfirm={engine.confirmCharacterCascade}
-          onDismiss={engine.dismissCharacterCascade}
+        />
+      )}
+
+      {engine.deletePrompt && (
+        <CharacterDeleteModal
+          characterName={engine.deletePrompt.character.name}
+          mentionCount={engine.deletePrompt.mentionCount}
+          loading={engine.deleteCharacterLoading}
+          onRemoveMentions={() => engine.confirmCharacterDelete("remove")}
+          onReplacePlaceholder={() => engine.confirmCharacterDelete("placeholder")}
+          onCodexOnly={() => engine.confirmCharacterDelete("codex")}
+          onDismiss={engine.dismissCharacterDelete}
         />
       )}
 

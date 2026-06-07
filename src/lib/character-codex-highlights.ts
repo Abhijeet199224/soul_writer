@@ -46,6 +46,21 @@ export function clearCharacterCodexMarks(editor: Editor): void {
   editor.view.dispatch(tr);
 }
 
+function getCharacterSearchTerms(character: Character): string[] {
+  const terms = [character.name.trim()];
+  if (character.aliases) {
+    terms.push(
+      ...character.aliases
+        .split(/[,;|]/)
+        .map((alias) => alias.trim())
+        .filter(Boolean),
+    );
+  }
+  return [...new Set(terms.filter(Boolean))].sort(
+    (a, b) => b.length - a.length,
+  );
+}
+
 export function applyCharacterCodexMarks(
   editor: Editor,
   characters: Character[],
@@ -60,24 +75,35 @@ export function applyCharacterCodexMarks(
 
   clearCharacterCodexMarks(editor);
 
-  const sorted = [...characters].sort((a, b) => b.name.length - a.name.length);
+  const sorted = [...characters].sort(
+    (a, b) => b.name.length - a.name.length,
+  );
   let { tr } = editor.state;
 
   for (const character of sorted) {
-    if (!character.name.trim()) continue;
-    const ranges = findWordRangesInDoc(editor.state.doc, character.name);
-    for (const { from, to } of ranges) {
-      tr = tr.addMark(
-        from,
-        to,
-        markType.create({
-          characterId: character.id,
-          characterName: character.name,
-        }),
-      );
+    for (const term of getCharacterSearchTerms(character)) {
+      const ranges = findWordRangesInDoc(editor.state.doc, term);
+      for (const { from, to } of ranges) {
+        tr = tr.addMark(
+          from,
+          to,
+          markType.create({
+            characterId: character.id,
+            characterName: character.name,
+          }),
+        );
+      }
     }
   }
 
   tr.setMeta("addToHistory", false);
   editor.view.dispatch(tr);
+}
+
+/** Re-apply codex underlines after cascade or profile edits. */
+export function refreshCharacterCodexMarks(
+  editor: Editor,
+  characters: Character[],
+): void {
+  applyCharacterCodexMarks(editor, characters);
 }
