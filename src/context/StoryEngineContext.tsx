@@ -604,9 +604,9 @@ export function StoryEngineProvider({
       setChapters((prev) =>
         prev.map((chapter) => {
           const patched = patchById.get(chapter.id);
-          return patched !== undefined
-            ? { ...chapter, draft_content: patched }
-            : chapter;
+          if (patched === undefined) return chapter;
+          if (chapter.id === activeChapterId) return chapter;
+          return { ...chapter, draft_content: patched };
         }),
       );
 
