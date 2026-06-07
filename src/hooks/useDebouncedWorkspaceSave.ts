@@ -33,7 +33,7 @@ interface UseDebouncedChapterSaveOptions {
   metaSnapshot: StoryMetaSnapshot;
   enabled?: boolean;
   baselineKey?: string;
-  onSaveConflict?: () => void;
+  onSaveConflict?: (message: string) => void;
 }
 
 export function useDebouncedChapterSave({
@@ -108,8 +108,14 @@ export function useDebouncedChapterSave({
       });
 
       if (response.status === 409) {
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
         setSaveStatus("error");
-        onConflictRef.current?.();
+        onConflictRef.current?.(
+          data.error ??
+            "This chapter was updated elsewhere. Reload the story to avoid overwriting changes.",
+        );
         return;
       }
 

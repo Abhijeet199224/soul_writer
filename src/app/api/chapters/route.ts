@@ -173,6 +173,38 @@ export async function POST(request: Request) {
         }
       }
 
+      if (act !== undefined) {
+        const trimmedAct = act.trim();
+        if (!trimmedAct) {
+          return NextResponse.json(
+            { error: "Act label cannot be empty." },
+            { status: 400 },
+          );
+        }
+
+        const { data: siblings, error: siblingsError } = await supabase
+          .from("story_chapters")
+          .select("id, act")
+          .eq("story_id", storyId)
+          .neq("id", chapterId);
+
+        if (siblingsError) {
+          return NextResponse.json({ error: siblingsError.message }, { status: 500 });
+        }
+
+        const duplicate = (siblings ?? []).some(
+          (row) => row.act.trim().toLowerCase() === trimmedAct.toLowerCase(),
+        );
+        if (duplicate) {
+          return NextResponse.json(
+            {
+              error: `An Act named "${trimmedAct}" already exists in this story.`,
+            },
+            { status: 409 },
+          );
+        }
+      }
+
       const chapterRow: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
       };
@@ -190,6 +222,14 @@ export async function POST(request: Request) {
         .eq("story_id", storyId);
 
       if (chapterError) {
+        if (chapterError.code === "23505") {
+          return NextResponse.json(
+            {
+              error: `An Act named "${String(act).trim()}" already exists in this story.`,
+            },
+            { status: 409 },
+          );
+        }
         return NextResponse.json({ error: chapterError.message }, { status: 500 });
       }
     }

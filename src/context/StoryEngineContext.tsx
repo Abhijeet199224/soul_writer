@@ -176,7 +176,9 @@ interface StoryEngineContextValue {
   addingChapter: boolean;
   chapterTitleFocusToken: number;
   setChapterTitle: (title: string) => void;
-  setChapterAct: (act: string) => void;
+  setChapterAct: (act: string) => boolean;
+  moveChapter: (chapterId: string, direction: "up" | "down") => Promise<void>;
+  reorderingChapter: boolean;
   addPlotBeat: () => void;
   renamePlotBeat: (beatId: string, title: string) => void;
   removePlotBeat: (beatId: string) => void;
@@ -267,6 +269,7 @@ export function StoryEngineProvider({
     null,
   );
   const [addingChapter, setAddingChapter] = useState(false);
+  const [reorderingChapter, setReorderingChapter] = useState(false);
   const [chapterTitleFocusToken, setChapterTitleFocusToken] = useState(0);
   const [chapterDeletePrompt, setChapterDeletePrompt] =
     useState<ChapterDeletePrompt | null>(null);
@@ -384,12 +387,18 @@ export function StoryEngineProvider({
     setChaptersLoaded(true);
   }, [story.id]);
 
-  const handleSaveConflict = useCallback(() => {
-    setInlineNotice(
-      "This chapter was updated elsewhere. Reloading the latest manuscript…",
-    );
-    void loadChapters();
-  }, [loadChapters]);
+  const handleSaveConflict = useCallback(
+    (message: string) => {
+      setInlineNotice(message);
+      if (
+        message.includes("updated elsewhere") ||
+        message.includes("already exists")
+      ) {
+        void loadChapters();
+      }
+    },
+    [loadChapters],
+  );
 
   const { saveStatus } = useDebouncedChapterSave({
     chapterSnapshot,
@@ -492,9 +501,59 @@ export function StoryEngineProvider({
 
   const setChapterAct = useCallback(
     (act: string) => {
-      updateChapterMeta({ act: act.trim() });
+      if (!activeChapter) return false;
+      const trimmed = act.trim();
+      if (!trimmed) {
+        setInlineNotice("Act label cannot be empty.");
+        return false;
+      }
+
+      const duplicate = chapters.some(
+        (chapter) =>
+          chapter.id !== activeChapter.id &&
+          chapter.act.trim().toLowerCase() === trimmed.toLowerCase(),
+      );
+      if (duplicate) {
+        setInlineNotice(
+          `An Act named "${trimmed}" already exists. Choose a different label.`,
+        );
+        return false;
+      }
+
+      updateChapterMeta({ act: trimmed });
+      return true;
     },
-    [updateChapterMeta],
+    [activeChapter, chapters, updateChapterMeta],
+  );
+
+  const moveChapter = useCallback(
+    async (chapterId: string, direction: "up" | "down") => {
+      setReorderingChapter(true);
+      try {
+        const response = await fetch("/api/chapters/reorder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storyId: story.id,
+            chapterId,
+            direction,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error ?? "Failed to reorder Acts");
+        }
+
+        setChapters(data.chapters ?? []);
+      } catch (error) {
+        setInlineNotice(
+          error instanceof Error ? error.message : "Failed to reorder Acts",
+        );
+      } finally {
+        setReorderingChapter(false);
+      }
+    },
+    [story.id],
   );
 
   const addPlotBeat = useCallback(() => {
@@ -1425,6 +1484,8 @@ export function StoryEngineProvider({
     chapterTitleFocusToken,
     setChapterTitle,
     setChapterAct,
+    moveChapter,
+    reorderingChapter,
     addPlotBeat,
     renamePlotBeat,
     removePlotBeat,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ChevronDown, ChevronUp, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import type { Character } from "@/lib/types";
 import { useStoryEngine } from "@/context/StoryEngineContext";
 import { CharacterForm } from "@/components/characters/CharacterForm";
@@ -35,6 +35,8 @@ export function NavigatorPanel() {
     setSettingNotes,
     updateChapterMeta,
     setChapterAct,
+    moveChapter,
+    reorderingChapter,
     addPlotBeat,
     renamePlotBeat,
     removePlotBeat,
@@ -45,6 +47,7 @@ export function NavigatorPanel() {
   const [section, setSection] = useState<NavigatorSection>("chapters");
   const [editing, setEditing] = useState<Character | null>(null);
   const [showCharacterForm, setShowCharacterForm] = useState(false);
+  const [editingActDraft, setEditingActDraft] = useState<string | null>(null);
 
   if (navigatorCollapsed) {
     return (
@@ -126,7 +129,7 @@ export function NavigatorPanel() {
                 ))}
               </div>
             ) : (
-              chapters.map((chapter) => {
+              chapters.map((chapter, chapterIndex) => {
                 const isActive = chapter.id === activeChapterId;
                 return (
                   <div
@@ -146,10 +149,28 @@ export function NavigatorPanel() {
                       >
                         {isActive ? (
                           <input
-                            value={chapter.act}
-                            onChange={(event) =>
-                              setChapterAct(event.target.value)
+                            value={
+                              editingActDraft !== null ? editingActDraft : chapter.act
                             }
+                            onFocus={() => setEditingActDraft(chapter.act)}
+                            onChange={(event) =>
+                              setEditingActDraft(event.target.value)
+                            }
+                            onBlur={() => {
+                              if (editingActDraft !== null) {
+                                setChapterAct(editingActDraft);
+                                setEditingActDraft(null);
+                              }
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.currentTarget.blur();
+                              }
+                              if (event.key === "Escape") {
+                                setEditingActDraft(null);
+                                event.currentTarget.blur();
+                              }
+                            }}
                             onClick={(event) => event.stopPropagation()}
                             className="w-full rounded-md border border-amber-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 outline-none focus:border-amber-400"
                           />
@@ -167,16 +188,42 @@ export function NavigatorPanel() {
                           </p>
                         )}
                       </button>
-                      {chapters.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => requestChapterDelete(chapter)}
-                          className="shrink-0 rounded-md px-2 py-1 text-[10px] text-red-600 hover:bg-red-50"
-                          title="Delete this Act"
-                        >
-                          Delete
-                        </button>
-                      )}
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        {chapters.length > 1 && (
+                          <div className="flex items-center gap-0.5">
+                            <button
+                              type="button"
+                              disabled={chapterIndex === 0 || reorderingChapter}
+                              onClick={() => void moveChapter(chapter.id, "up")}
+                              className="rounded-md p-1 text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:opacity-30"
+                              title="Move Act up"
+                            >
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={
+                                chapterIndex === chapters.length - 1 || reorderingChapter
+                              }
+                              onClick={() => void moveChapter(chapter.id, "down")}
+                              className="rounded-md p-1 text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:opacity-30"
+                              title="Move Act down"
+                            >
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
+                        {chapters.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => requestChapterDelete(chapter)}
+                            className="rounded-md px-2 py-1 text-[10px] text-red-600 hover:bg-red-50"
+                            title="Delete this Act"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {isActive ? (
