@@ -11,9 +11,9 @@ export interface StoryNotes {
 
 const defaultNotes: StoryNotes = {
   outline: [
-    { id: "1", title: "Act 1: The Inciting Incident", act: "Act 1" },
-    { id: "2", title: "Act 2: The Midpoint Crisis", act: "Act 2" },
-    { id: "3", title: "Act 3: The Final Confrontation", act: "Act 3" },
+    { id: "1", title: "Chapter 1: The Inciting Incident", act: "Chapter 1" },
+    { id: "2", title: "Chapter 2: The Midpoint Crisis", act: "Chapter 2" },
+    { id: "3", title: "Chapter 3: The Final Confrontation", act: "Chapter 3" },
   ],
   settingNotes: "",
 };

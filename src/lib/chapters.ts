@@ -1,11 +1,36 @@
 import type { GhostwriteTier, PlotBeat, StoryChapter } from "@/lib/types";
 
+export function formatChapterLabel(number: number): string {
+  return `Chapter ${number}`;
+}
+
+export function buildRenumberedChapterUpdates(
+  chapters: Array<{ id: string; sequence: number }>,
+): Array<{ id: string; sequence: number; act: string }> {
+  return [...chapters]
+    .sort((a, b) => a.sequence - b.sequence)
+    .map((chapter, index) => ({
+      id: chapter.id,
+      sequence: index,
+      act: formatChapterLabel(index + 1),
+    }));
+}
+
+export function chaptersNeedRenumbering(
+  chapters: Array<{ sequence: number; act: string }>,
+): boolean {
+  const sorted = [...chapters].sort((a, b) => a.sequence - b.sequence);
+  return sorted.some(
+    (chapter, index) => chapter.act !== formatChapterLabel(index + 1),
+  );
+}
+
 export const DEFAULT_CHAPTERS: Omit<
   StoryChapter,
   "id" | "story_id" | "created_at" | "updated_at"
 >[] = [
   {
-    act: "Act 1",
+    act: "Chapter 1",
     title: "The Inciting Incident",
     sequence: 0,
     plot_beats: [
@@ -18,7 +43,7 @@ export const DEFAULT_CHAPTERS: Omit<
     draft_content: "",
   },
   {
-    act: "Act 2",
+    act: "Chapter 2",
     title: "The Midpoint Crisis",
     sequence: 1,
     plot_beats: [
@@ -31,7 +56,7 @@ export const DEFAULT_CHAPTERS: Omit<
     draft_content: "",
   },
   {
-    act: "Act 3",
+    act: "Chapter 3",
     title: "The Final Confrontation",
     sequence: 2,
     plot_beats: [
@@ -94,7 +119,7 @@ export function getGhostwriteTier(sliderValue: number): GhostwriteTier {
 export function formatChapterContext(chapter: StoryChapter): string {
   const beats = chapter.plot_beats.map((b) => `• ${b.title}`).join("\n");
   return [
-    `Act/Chapter: ${chapter.act} — ${chapter.title}`,
+    `Chapter: ${chapter.act} — ${chapter.title}`,
     chapter.plot_objectives
       ? `Plot objectives: ${chapter.plot_objectives}`
       : null,
@@ -117,7 +142,7 @@ export function buildChaptersFromLegacyWorkspace(
   for (const item of outline) {
     if (typeof item !== "object" || item === null) continue;
     const beat = item as Record<string, unknown>;
-    const act = String(beat.act ?? "Act 2");
+    const act = String(beat.act ?? "Chapter 2");
     const title = String(beat.title ?? "Untitled");
     const id = String(beat.id ?? crypto.randomUUID());
     const entry = actMap.get(act) ?? { title, beats: [] };

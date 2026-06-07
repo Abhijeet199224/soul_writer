@@ -23,7 +23,7 @@ export function ChapterDeleteModal({
         className="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-6 shadow-2xl"
       >
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">
-          Delete Act
+          Delete chapter
         </p>
         <h2 className="mt-2 font-serif text-xl text-stone-900">
           Delete {actLabel}?
@@ -31,7 +31,8 @@ export function ChapterDeleteModal({
         <p className="mt-3 text-sm text-stone-600">
           This permanently removes{" "}
           <strong>{chapterTitle || "this chapter workspace"}</strong> and its
-          manuscript draft. You must keep at least one Act in the story.
+          manuscript draft. Remaining chapters will be renumbered automatically.
+          You must keep at least one chapter in the story.
         </p>
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button
@@ -48,7 +49,7 @@ export function ChapterDeleteModal({
             disabled={loading}
             className="rounded-xl bg-rose-700 px-4 py-2 text-sm font-medium text-white hover:bg-rose-800 disabled:opacity-60"
           >
-            {loading ? "Deleting…" : "Delete Act"}
+            {loading ? "Deleting…" : "Delete chapter"}
           </button>
         </div>
       </div>

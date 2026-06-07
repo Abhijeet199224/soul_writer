@@ -34,7 +34,6 @@ export function NavigatorPanel() {
     settingNotes,
     setSettingNotes,
     updateChapterMeta,
-    setChapterAct,
     moveChapter,
     reorderingChapter,
     addPlotBeat,
@@ -47,7 +46,6 @@ export function NavigatorPanel() {
   const [section, setSection] = useState<NavigatorSection>("chapters");
   const [editing, setEditing] = useState<Character | null>(null);
   const [showCharacterForm, setShowCharacterForm] = useState(false);
-  const [editingActDraft, setEditingActDraft] = useState<string | null>(null);
 
   if (navigatorCollapsed) {
     return (
@@ -83,7 +81,7 @@ export function NavigatorPanel() {
       <div className="flex border-b border-stone-100 px-2 py-2">
         {(
           [
-            ["chapters", "Acts"],
+            ["chapters", "Chapters"],
             ["characters", "Characters"],
             ["settings", "Lore"],
           ] as const
@@ -112,8 +110,9 @@ export function NavigatorPanel() {
         {section === "chapters" && (
           <div className="space-y-3">
             <p className="text-xs text-stone-500">
-              Each Act is a chapter workspace. Edit trajectory beats, rename the
-              Act label, or delete Acts you no longer need.
+              Each chapter is its own workspace. Edit trajectory beats, set
+              objectives, reorder chapters, or delete chapters you no longer
+              need. Numbers update automatically when a chapter is removed.
             </p>
             {!chaptersLoaded ? (
               <div className="space-y-3">
@@ -147,38 +146,9 @@ export function NavigatorPanel() {
                         title={`Open ${chapter.act} workspace`}
                         className="min-w-0 flex-1 text-left"
                       >
-                        {isActive ? (
-                          <input
-                            value={
-                              editingActDraft !== null ? editingActDraft : chapter.act
-                            }
-                            onFocus={() => setEditingActDraft(chapter.act)}
-                            onChange={(event) =>
-                              setEditingActDraft(event.target.value)
-                            }
-                            onBlur={() => {
-                              if (editingActDraft !== null) {
-                                setChapterAct(editingActDraft);
-                                setEditingActDraft(null);
-                              }
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.currentTarget.blur();
-                              }
-                              if (event.key === "Escape") {
-                                setEditingActDraft(null);
-                                event.currentTarget.blur();
-                              }
-                            }}
-                            onClick={(event) => event.stopPropagation()}
-                            className="w-full rounded-md border border-amber-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 outline-none focus:border-amber-400"
-                          />
-                        ) : (
-                          <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                            {chapter.act}
-                          </span>
-                        )}
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                          {chapter.act}
+                        </span>
                         <p className="mt-1 font-serif text-sm font-medium text-stone-900">
                           {chapter.title || "Untitled chapter"}
                         </p>
@@ -196,7 +166,7 @@ export function NavigatorPanel() {
                               disabled={chapterIndex === 0 || reorderingChapter}
                               onClick={() => void moveChapter(chapter.id, "up")}
                               className="rounded-md p-1 text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:opacity-30"
-                              title="Move Act up"
+                              title="Move chapter up"
                             >
                               <ChevronUp className="h-3.5 w-3.5" />
                             </button>
@@ -207,7 +177,7 @@ export function NavigatorPanel() {
                               }
                               onClick={() => void moveChapter(chapter.id, "down")}
                               className="rounded-md p-1 text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:opacity-30"
-                              title="Move Act down"
+                              title="Move chapter down"
                             >
                               <ChevronDown className="h-3.5 w-3.5" />
                             </button>
@@ -218,7 +188,7 @@ export function NavigatorPanel() {
                             type="button"
                             onClick={() => requestChapterDelete(chapter)}
                             className="rounded-md px-2 py-1 text-[10px] text-red-600 hover:bg-red-50"
-                            title="Delete this Act"
+                            title="Delete this chapter"
                           >
                             Delete
                           </button>
@@ -281,10 +251,10 @@ export function NavigatorPanel() {
               type="button"
               onClick={() => void addChapter()}
               disabled={addingChapter}
-              title="Create a new Act/Chapter workspace with default trajectory beats"
+              title="Create a new chapter workspace with default trajectory beats"
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-amber-300 bg-amber-50/60 px-3 py-3 text-sm font-medium text-amber-900 transition hover:border-amber-400 hover:bg-amber-50 disabled:opacity-60"
             >
-              {addingChapter ? "Creating chapter…" : "+ Add Chapter / Act"}
+              {addingChapter ? "Creating chapter…" : "+ Add Chapter"}
             </button>
           </div>
         )}

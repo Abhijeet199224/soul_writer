@@ -176,7 +176,6 @@ interface StoryEngineContextValue {
   addingChapter: boolean;
   chapterTitleFocusToken: number;
   setChapterTitle: (title: string) => void;
-  setChapterAct: (act: string) => boolean;
   moveChapter: (chapterId: string, direction: "up" | "down") => Promise<void>;
   reorderingChapter: boolean;
   addPlotBeat: () => void;
@@ -546,33 +545,6 @@ export function StoryEngineProvider({
     [updateChapterMeta],
   );
 
-  const setChapterAct = useCallback(
-    (act: string) => {
-      if (!activeChapter) return false;
-      const trimmed = act.trim();
-      if (!trimmed) {
-        setInlineNotice("Act label cannot be empty.");
-        return false;
-      }
-
-      const duplicate = chapters.some(
-        (chapter) =>
-          chapter.id !== activeChapter.id &&
-          chapter.act.trim().toLowerCase() === trimmed.toLowerCase(),
-      );
-      if (duplicate) {
-        setInlineNotice(
-          `An Act named "${trimmed}" already exists. Choose a different label.`,
-        );
-        return false;
-      }
-
-      updateChapterMeta({ act: trimmed });
-      return true;
-    },
-    [activeChapter, chapters, updateChapterMeta],
-  );
-
   const moveChapter = useCallback(
     async (chapterId: string, direction: "up" | "down") => {
       setReorderingChapter(true);
@@ -588,14 +560,14 @@ export function StoryEngineProvider({
         });
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(data.error ?? "Failed to reorder Acts");
+          throw new Error(data.error ?? "Failed to reorder chapters");
         }
 
         setChapters(data.chapters ?? []);
         bumpPersistBaseline();
       } catch (error) {
         setInlineNotice(
-          error instanceof Error ? error.message : "Failed to reorder Acts",
+          error instanceof Error ? error.message : "Failed to reorder chapters",
         );
       } finally {
         setReorderingChapter(false);
@@ -678,8 +650,9 @@ export function StoryEngineProvider({
         throw new Error(data.error ?? "Failed to delete chapter");
       }
 
-      setChapters((prev) => prev.filter((item) => item.id !== chapter.id));
+      setChapters(data.chapters ?? []);
       setActiveChapterId(data.activeChapterId as string | null);
+      bumpPersistBaseline();
       setChapterDeletePrompt(null);
       setActiveInsightIndex(null);
       clearRewriteStates();
@@ -692,7 +665,7 @@ export function StoryEngineProvider({
     } finally {
       setDeleteChapterLoading(false);
     }
-  }, [chapterDeletePrompt, story.id, clearRewriteStates]);
+  }, [chapterDeletePrompt, story.id, clearRewriteStates, bumpPersistBaseline]);
 
   const addChapter = useCallback(async () => {
     setAddingChapter(true);
@@ -1240,7 +1213,7 @@ export function StoryEngineProvider({
         );
         const codexContext = [
           sessionContext
-            ? `Act: ${sessionContext.act}\nChapter: ${sessionContext.chapterTitle}\nPlot objectives: ${sessionContext.plotObjectives || "None"}\nScene beat: ${sessionContext.sceneBeat || "None"}`
+            ? `Chapter: ${sessionContext.act}\nTitle: ${sessionContext.chapterTitle}\nPlot objectives: ${sessionContext.plotObjectives || "None"}\nScene beat: ${sessionContext.sceneBeat || "None"}`
             : "",
           settingNotes.trim()
             ? `Setting & lore:\n${settingNotes.trim()}`
@@ -1536,7 +1509,6 @@ export function StoryEngineProvider({
     addingChapter,
     chapterTitleFocusToken,
     setChapterTitle,
-    setChapterAct,
     moveChapter,
     reorderingChapter,
     addPlotBeat,

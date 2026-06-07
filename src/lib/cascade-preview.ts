@@ -52,7 +52,7 @@ export function buildCascadeChapterPreviews(
       const afterPlain = htmlToPlainText(patch.draft_content);
       return {
         chapterId: patch.id,
-        act: chapter?.act ?? "Act",
+        act: chapter?.act ?? "Chapter",
         title: chapter?.title ?? "Untitled",
         mentionsReplaced: patch.mentionsReplaced,
         snippet: excerptAroundMatch(beforePlain, oldText),
