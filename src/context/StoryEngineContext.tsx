@@ -19,10 +19,7 @@ import {
 } from "@/lib/draft-content";
 import { useStoryBibleIndex } from "@/hooks/useStoryBibleIndex";
 import { useDebouncedChapterSave } from "@/hooks/useDebouncedWorkspaceSave";
-import {
-  countNameMentions,
-  draftContainsName,
-} from "@/lib/character-name-sync";
+import { countNameMentionsAcrossChapters } from "@/lib/manuscript-cascade";
 import type {
   GhostwriteAiResult,
   SoulCheckAiResult,
@@ -84,6 +81,7 @@ interface StoryEngineContextValue {
   focusMode: boolean;
   chaptersLoaded: boolean;
   renamePrompt: CharacterRenamePrompt | null;
+  cascadeRenameLoading: boolean;
   rewriteStates: Record<number, InsightRewriteState>;
   customRewriteLoading: number | null;
   registerEditor: (handle: TipTapEditorHandle | null) => void;
@@ -100,7 +98,7 @@ interface StoryEngineContextValue {
   updateChapterMeta: (updates: Partial<StoryChapter>) => void;
   setCharacters: (characters: Character[]) => void;
   handleCharacterSaved: (character: Character, previousName?: string) => void;
-  confirmRenameInDraft: () => void;
+  confirmRenameInDraft: () => Promise<void>;
   dismissRenamePrompt: () => void;
   runSelectionSoulCheck: (selectedText: string) => Promise<void>;
   runSoulCheck: () => Promise<void>;
@@ -186,6 +184,7 @@ export function StoryEngineProvider({
   );
   const [renamePrompt, setRenamePrompt] =
     useState<CharacterRenamePrompt | null>(null);
+  const [cascadeRenameLoading, setCascadeRenameLoading] = useState(false);
   const [rewriteStates, setRewriteStates] = useState<
     Record<number, InsightRewriteState>
   >({});
@@ -513,37 +512,81 @@ export function StoryEngineProvider({
         return next.sort((a, b) => a.name.localeCompare(b.name));
       });
 
-      if (
-        previousName &&
-        previousName !== character.name &&
-        activeChapter &&
-        draftContainsName(activeChapter.draft_content, previousName)
-      ) {
-        setRenamePrompt({
-          oldName: previousName,
-          newName: character.name,
-          mentionCount: countNameMentions(
-            activeChapter.draft_content,
-            previousName,
-          ),
-        });
+      if (previousName && previousName !== character.name) {
+        const mentionCount = countNameMentionsAcrossChapters(
+          chapters,
+          previousName,
+        );
+        if (mentionCount > 0) {
+          setRenamePrompt({
+            oldName: previousName,
+            newName: character.name,
+            mentionCount,
+          });
+        }
       }
     },
-    [activeChapter],
+    [chapters],
   );
 
-  const confirmRenameInDraft = useCallback(() => {
+  const confirmRenameInDraft = useCallback(async () => {
     if (!renamePrompt) return;
-    const editor = editorHandleRef.current;
-    if (!editor) return;
 
-    const ok = editor.replaceAllWords(
-      renamePrompt.oldName,
-      renamePrompt.newName,
-    );
-    if (!ok) return;
-    setRenamePrompt(null);
-  }, [renamePrompt]);
+    const { oldName, newName } = renamePrompt;
+    setCascadeRenameLoading(true);
+    setInlineNotice(null);
+
+    try {
+      const res = await fetch("/api/characters/cascade-rename", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storyId: story.id,
+          oldName,
+          newName,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(
+          err.error ?? "Failed to cascade rename across manuscript",
+        );
+      }
+
+      const data = (await res.json()) as {
+        chapters: Array<{ id: string; draft_content: string }>;
+      };
+
+      const patchById = new Map(
+        data.chapters.map((row) => [row.id, row.draft_content]),
+      );
+
+      setChapters((prev) =>
+        prev.map((chapter) => {
+          const patched = patchById.get(chapter.id);
+          return patched !== undefined
+            ? { ...chapter, draft_content: patched }
+            : chapter;
+        }),
+      );
+
+      if (activeChapterId && patchById.has(activeChapterId)) {
+        editorHandleRef.current?.replaceAllWords(oldName, newName);
+      }
+
+      setRenamePrompt(null);
+    } catch (err) {
+      console.error("[cascade-rename]", err);
+      setInlineNotice(
+        err instanceof Error
+          ? err.message
+          : "Could not sync character rename across manuscript.",
+      );
+    } finally {
+      setCascadeRenameLoading(false);
+    }
+  }, [renamePrompt, story.id, activeChapterId]);
 
   const syncRewriteStatesFromDocument = useCallback(() => {
     const editor = editorHandleRef.current;
@@ -908,6 +951,7 @@ export function StoryEngineProvider({
     focusMode,
     chaptersLoaded,
     renamePrompt,
+    cascadeRenameLoading,
     rewriteStates,
     customRewriteLoading,
     registerEditor,

@@ -57,6 +57,7 @@ function StoryDashboardShell() {
           oldName={engine.renamePrompt.oldName}
           newName={engine.renamePrompt.newName}
           mentionCount={engine.renamePrompt.mentionCount}
+          loading={engine.cascadeRenameLoading}
           onConfirm={engine.confirmRenameInDraft}
           onDismiss={engine.dismissRenamePrompt}
         />
