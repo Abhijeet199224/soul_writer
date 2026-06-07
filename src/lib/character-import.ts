@@ -110,7 +110,7 @@ export function parseCharacterJson(text: string): ParsedCharacterImport {
         errors.push(`Item ${index + 1}: expected an object`);
         return;
       }
-      const row = rowFromRecord(item as Record<string, string>, index + 1);
+      const row = rowFromRecord(item as Record<string, string>);
       if (!row) {
         errors.push(`Item ${index + 1}: missing name`);
         return;
