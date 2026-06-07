@@ -35,6 +35,7 @@ import {
   replaceTextInEditor,
   replaceAllWordsInEditor,
 } from "@/lib/editor-transactions";
+import { clearHighlightForTargetText } from "@/lib/soul-check-highlights";
 import { CharacterHoverCard } from "@/components/editor/CharacterHoverCard";
 
 export interface TipTapEditorHandle {
@@ -45,6 +46,8 @@ export interface TipTapEditorHandle {
   appendParagraph: (prose: string) => boolean;
   loadDocument: (html: string) => boolean;
   documentContainsText: (text: string) => boolean;
+  clearHighlightForTarget: (targetText: string) => void;
+  focusEditor: () => void;
 }
 
 interface TipTapEditorProps {
@@ -170,6 +173,9 @@ export function TipTapEditor({
       loadDocument: (html: string) => loadDocumentWithoutHistory(editor, html),
       documentContainsText: (text: string) =>
         documentContainsText(editor, text),
+      clearHighlightForTarget: (targetText: string) =>
+        clearHighlightForTargetText(editor, targetText),
+      focusEditor: () => editor.chain().focus().run(),
     };
   }, [editor]);
 

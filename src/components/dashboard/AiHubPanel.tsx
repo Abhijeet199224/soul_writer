@@ -105,6 +105,7 @@ function SoulCheckInsightCard({
   onApplyPreset,
   onCustomRewrite,
   onToggleRewrite,
+  onResolve,
 }: {
   insight: SoulCheckInsight;
   index: number;
@@ -124,6 +125,7 @@ function SoulCheckInsightCard({
     prompt: string,
   ) => void;
   onToggleRewrite: (insightIndex: number) => void;
+  onResolve: (insightIndex: number) => void;
 }) {
   const tones = insight.toneSuggestions;
   const [customPrompt, setCustomPrompt] = useState("");
@@ -240,6 +242,15 @@ function SoulCheckInsightCard({
           </p>
         )}
       </form>
+
+      <button
+        type="button"
+        onClick={() => onResolve(index)}
+        title="Clear the canvas highlight and dismiss this critique"
+        className="mt-3 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-medium text-stone-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-900"
+      >
+        ✓ Mark as Resolved
+      </button>
     </article>
   );
 }
@@ -366,6 +377,19 @@ export function AiHubPanel() {
               : ghostwriteButtonLabel(engine.sliderValue, false)}
         </button>
 
+        {engine.inlineNotice && (
+          <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900">
+            {engine.inlineNotice}
+            <button
+              type="button"
+              onClick={engine.clearInlineNotice}
+              className="ml-2 font-medium underline"
+            >
+              Dismiss
+            </button>
+          </p>
+        )}
+
         {engine.aiError && (
           <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
             {engine.aiError}
@@ -424,6 +448,7 @@ export function AiHubPanel() {
                       void engine.runCustomRewrite(idx, target, prompt)
                     }
                     onToggleRewrite={engine.toggleRewrite}
+                    onResolve={engine.resolveInsight}
                   />
                 ))}
               </div>

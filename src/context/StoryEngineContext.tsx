@@ -117,8 +117,21 @@ interface StoryEngineContextValue {
     customPrompt: string,
   ) => Promise<void>;
   toggleRewrite: (insightIndex: number) => void;
+  resolveInsight: (insightIndex: number) => void;
   setActiveInsightIndex: (index: number | null) => void;
   onHighlightInsight: (index: number) => void;
+  addChapter: () => Promise<void>;
+  addingChapter: boolean;
+  chapterTitleFocusToken: number;
+  setChapterTitle: (title: string) => void;
+  codexOpen: boolean;
+  setCodexOpen: (open: boolean) => void;
+  toneAlignmentLoading: boolean;
+  toneAlignmentReport: string | null;
+  runToneAlignmentCheck: () => Promise<void>;
+  inlineNotice: string | null;
+  clearInlineNotice: () => void;
+  isProcessingLargeContent: boolean;
 }
 
 const StoryEngineContext = createContext<StoryEngineContextValue | null>(null);
@@ -179,7 +192,17 @@ export function StoryEngineProvider({
   const [customRewriteLoading, setCustomRewriteLoading] = useState<number | null>(
     null,
   );
+  const [addingChapter, setAddingChapter] = useState(false);
+  const [chapterTitleFocusToken, setChapterTitleFocusToken] = useState(0);
+  const [codexOpen, setCodexOpen] = useState(false);
+  const [toneAlignmentLoading, setToneAlignmentLoading] = useState(false);
+  const [toneAlignmentReport, setToneAlignmentReport] = useState<string | null>(
+    null,
+  );
+  const [inlineNotice, setInlineNotice] = useState<string | null>(null);
+  const [isProcessingLargeContent, setIsProcessingLargeContent] = useState(false);
 
+  const clearInlineNotice = useCallback(() => setInlineNotice(null), []);
   const clearRewriteStates = useCallback(() => setRewriteStates({}), []);
   const rewriteStatesRef = useRef(rewriteStates);
 
@@ -328,6 +351,13 @@ export function StoryEngineProvider({
   const updateDraft = useCallback(
     (html: string) => {
       if (!activeChapter) return;
+
+      const plainLength = htmlToPlainText(html).length;
+      if (plainLength > 50_000) {
+        setIsProcessingLargeContent(true);
+        window.setTimeout(() => setIsProcessingLargeContent(false), 400);
+      }
+
       updateChapterInState(activeChapter.id, {
         draft_content: html,
       });
@@ -354,6 +384,124 @@ export function StoryEngineProvider({
     },
     [activeChapter, updateChapterInState],
   );
+
+  const setChapterTitle = useCallback(
+    (title: string) => {
+      updateChapterMeta({ title });
+    },
+    [updateChapterMeta],
+  );
+
+  const addChapter = useCallback(async () => {
+    setAddingChapter(true);
+    setAiError(null);
+
+    try {
+      const response = await fetch("/api/chapters/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storyId: story.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Failed to add chapter");
+
+      const chapter = data.chapter as StoryChapter;
+      setChapters((prev) =>
+        [...prev, chapter].sort((a, b) => a.sequence - b.sequence),
+      );
+      setActiveChapterId(chapter.id);
+      setActiveInsightIndex(null);
+      clearRewriteStates();
+      setSoulCheckResult(null);
+      setGhostwriteResult(null);
+      setActivePlotBeatTitle(null);
+      setChapterTitleFocusToken((token) => token + 1);
+      setNavigatorCollapsed(false);
+    } catch (error) {
+      setAiError(
+        error instanceof Error ? error.message : "Failed to add chapter",
+      );
+    } finally {
+      setAddingChapter(false);
+    }
+  }, [story.id, clearRewriteStates]);
+
+  const resolveInsight = useCallback(
+    (insightIndex: number) => {
+      const insight = soulCheckResult?.data.insights[insightIndex];
+      if (!insight) return;
+
+      editorHandleRef.current?.clearHighlightForTarget(insight.targetText.trim());
+
+      setSoulCheckResult((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          data: {
+            insights: prev.data.insights.filter(
+              (_, index) => index !== insightIndex,
+            ),
+          },
+        };
+      });
+
+      setRewriteStates((prev) => {
+        const next: Record<number, InsightRewriteState> = {};
+        Object.entries(prev).forEach(([key, value]) => {
+          const index = Number(key);
+          if (index === insightIndex) return;
+          next[index > insightIndex ? index - 1 : index] = value;
+        });
+        return next;
+      });
+
+      if (activeInsightIndex === insightIndex) {
+        setActiveInsightIndex(null);
+      } else if (
+        activeInsightIndex != null &&
+        activeInsightIndex > insightIndex
+      ) {
+        setActiveInsightIndex(activeInsightIndex - 1);
+      }
+    },
+    [soulCheckResult, activeInsightIndex],
+  );
+
+  const runToneAlignmentCheck = useCallback(async () => {
+    if (!plainDraft.trim()) {
+      setToneAlignmentReport(
+        "Write a paragraph in this chapter before verifying tone alignment.",
+      );
+      return;
+    }
+
+    setToneAlignmentLoading(true);
+    setToneAlignmentReport(null);
+
+    try {
+      const response = await fetch("/api/tone-alignment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storyId: story.id,
+          draft: plainDraft,
+          chapterId: activeChapterId,
+          settingNotes,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error ?? "Tone alignment check failed");
+      }
+      setToneAlignmentReport(data.report as string);
+    } catch (error) {
+      setToneAlignmentReport(
+        error instanceof Error ? error.message : "Tone alignment check failed",
+      );
+    } finally {
+      setToneAlignmentLoading(false);
+    }
+  }, [story.id, plainDraft, activeChapterId, settingNotes]);
 
   const handleCharacterSaved = useCallback(
     (character: Character, previousName?: string) => {
@@ -462,6 +610,7 @@ export function StoryEngineProvider({
           label,
         },
       });
+      editor.clearHighlightForTarget(targetText.trim());
       setActiveInsightIndex(insightIndex);
     },
     [],
@@ -572,8 +721,18 @@ export function StoryEngineProvider({
 
   const runSelectionSoulCheck = useCallback(
     async (selectedText: string) => {
+      if (!selectedText.trim()) {
+        setInlineNotice(
+          "Write or draft a paragraph first before running a Soul Check!",
+        );
+        setAiTab("soul-check");
+        setAiHubCollapsed(false);
+        return;
+      }
+
       setSelectionLoading(true);
       setAiError(null);
+      setInlineNotice(null);
       setAiTab("soul-check");
       setAiHubCollapsed(false);
       setActiveInsightIndex(null);
@@ -610,8 +769,18 @@ export function StoryEngineProvider({
   );
 
   const runSoulCheck = useCallback(async () => {
+    if (!plainDraft.trim()) {
+      setInlineNotice(
+        "Write or draft a paragraph first before running a Soul Check!",
+      );
+      setAiTab("soul-check");
+      setAiHubCollapsed(false);
+      return;
+    }
+
     setAiLoading("soul-check");
     setAiError(null);
+    setInlineNotice(null);
     setAiTab("soul-check");
     setAiHubCollapsed(false);
     setActiveInsightIndex(null);
@@ -763,8 +932,21 @@ export function StoryEngineProvider({
     applyPresetRewrite,
     runCustomRewrite,
     toggleRewrite,
+    resolveInsight,
     setActiveInsightIndex,
     onHighlightInsight,
+    addChapter,
+    addingChapter,
+    chapterTitleFocusToken,
+    setChapterTitle,
+    codexOpen,
+    setCodexOpen,
+    toneAlignmentLoading,
+    toneAlignmentReport,
+    runToneAlignmentCheck,
+    inlineNotice,
+    clearInlineNotice,
+    isProcessingLargeContent,
   };
 
   return (
