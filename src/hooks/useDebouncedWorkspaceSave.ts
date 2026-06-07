@@ -33,7 +33,30 @@ interface UseDebouncedChapterSaveOptions {
   metaSnapshot: StoryMetaSnapshot;
   enabled?: boolean;
   baselineKey?: string;
+  persistBaselineKey?: string;
   onSaveConflict?: (message: string) => void;
+  onChapterPersisted?: (payload: {
+    chapterId: string;
+    updatedAt: string;
+  }) => void;
+}
+
+function stablePayloadKey(
+  chapter: ChapterSaveSnapshot,
+  meta: StoryMetaSnapshot,
+): string {
+  return JSON.stringify({
+    chapter: {
+      chapterId: chapter.chapterId,
+      draftContent: chapter.draftContent,
+      sceneBeat: chapter.sceneBeat,
+      title: chapter.title,
+      act: chapter.act,
+      plotObjectives: chapter.plotObjectives,
+      plotBeats: chapter.plotBeats,
+    },
+    meta,
+  });
 }
 
 export function useDebouncedChapterSave({
@@ -41,7 +64,9 @@ export function useDebouncedChapterSave({
   metaSnapshot,
   enabled = true,
   baselineKey,
+  persistBaselineKey,
   onSaveConflict,
+  onChapterPersisted,
 }: UseDebouncedChapterSaveOptions) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>(
     baselineKey ? "saved" : "idle",
@@ -51,9 +76,18 @@ export function useDebouncedChapterSave({
   const chapterRef = useRef(chapterSnapshot);
   const metaRef = useRef(metaSnapshot);
   const onConflictRef = useRef(onSaveConflict);
+  const onPersistedRef = useRef(onChapterPersisted);
+  const expectedUpdatedAtRef = useRef<string | null>(
+    chapterSnapshot.expectedUpdatedAt ?? null,
+  );
+
   useEffect(() => {
     onConflictRef.current = onSaveConflict;
   }, [onSaveConflict]);
+
+  useEffect(() => {
+    onPersistedRef.current = onChapterPersisted;
+  }, [onChapterPersisted]);
 
   const lastDraftRef = useRef(chapterSnapshot.draftContent);
 
@@ -65,10 +99,23 @@ export function useDebouncedChapterSave({
     metaRef.current = metaSnapshot;
   }, [metaSnapshot]);
 
+  useEffect(() => {
+    expectedUpdatedAtRef.current = chapterSnapshot.expectedUpdatedAt ?? null;
+  }, [chapterSnapshot.chapterId, chapterSnapshot.expectedUpdatedAt]);
+
+  useEffect(() => {
+    if (!persistBaselineKey) return;
+    lastSavedRef.current = stablePayloadKey(chapterRef.current, metaRef.current);
+    lastDraftRef.current = chapterRef.current.draftContent;
+    expectedUpdatedAtRef.current = chapterRef.current.expectedUpdatedAt ?? null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset save indicator after server sync
+    setSaveStatus("saved");
+  }, [persistBaselineKey]);
+
   const persist = useCallback(async () => {
     const chapter = chapterRef.current;
     const meta = metaRef.current;
-    const payloadKey = JSON.stringify({ chapter, meta });
+    const payloadKey = stablePayloadKey(chapter, meta);
 
     if (payloadKey === lastSavedRef.current) {
       setSaveStatus("saved");
@@ -103,7 +150,7 @@ export function useDebouncedChapterSave({
           activeChapterId: meta.activeChapterId,
           settingNotes: meta.settingNotes,
           sliderValue: meta.sliderValue,
-          expectedUpdatedAt: chapter.expectedUpdatedAt,
+          expectedUpdatedAt: expectedUpdatedAtRef.current,
         }),
       });
 
@@ -124,6 +171,15 @@ export function useDebouncedChapterSave({
         throw new Error(data.error ?? "Save failed");
       }
 
+      const data = (await response.json()) as { chapterUpdatedAt?: string | null };
+      if (data.chapterUpdatedAt) {
+        expectedUpdatedAtRef.current = data.chapterUpdatedAt;
+        onPersistedRef.current?.({
+          chapterId: chapter.chapterId,
+          updatedAt: data.chapterUpdatedAt,
+        });
+      }
+
       lastSavedRef.current = payloadKey;
       lastDraftRef.current = chapter.draftContent;
       setSaveStatus("saved");
@@ -137,10 +193,7 @@ export function useDebouncedChapterSave({
 
     if (timerRef.current) clearTimeout(timerRef.current);
 
-    const payloadKey = JSON.stringify({
-      chapter: chapterSnapshot,
-      meta: metaSnapshot,
-    });
+    const payloadKey = stablePayloadKey(chapterSnapshot, metaSnapshot);
 
     if (payloadKey === lastSavedRef.current) {
       setSaveStatus("saved");

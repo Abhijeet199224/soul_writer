@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
   buildChaptersFromLegacyWorkspace,
+  chapterTimestampsEqual,
   normalizeChapter,
 } from "@/lib/chapters";
 
@@ -150,6 +151,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Story not found" }, { status: 404 });
     }
 
+    let chapterUpdatedAt: string | null = null;
+
     if (chapterId) {
       if (body.expectedUpdatedAt) {
         const { data: currentChapter } = await supabase
@@ -161,7 +164,10 @@ export async function POST(request: Request) {
 
         if (
           currentChapter?.updated_at &&
-          currentChapter.updated_at !== body.expectedUpdatedAt
+          !chapterTimestampsEqual(
+            currentChapter.updated_at,
+            body.expectedUpdatedAt,
+          )
         ) {
           return NextResponse.json(
             {
@@ -215,11 +221,13 @@ export async function POST(request: Request) {
       if (title !== undefined) chapterRow.title = title;
       if (act !== undefined) chapterRow.act = act.trim();
 
-      const { error: chapterError } = await supabase
+      const { data: updatedChapter, error: chapterError } = await supabase
         .from("story_chapters")
         .update(chapterRow)
         .eq("id", chapterId)
-        .eq("story_id", storyId);
+        .eq("story_id", storyId)
+        .select("updated_at")
+        .single();
 
       if (chapterError) {
         if (chapterError.code === "23505") {
@@ -232,6 +240,10 @@ export async function POST(request: Request) {
         }
         return NextResponse.json({ error: chapterError.message }, { status: 500 });
       }
+
+      chapterUpdatedAt = updatedChapter?.updated_at
+        ? String(updatedChapter.updated_at)
+        : null;
     }
 
     const workspaceRow: Record<string, unknown> = {
@@ -252,7 +264,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: workspaceError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, chapterUpdatedAt });
   } catch (err) {
     console.error("POST /api/chapters:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
