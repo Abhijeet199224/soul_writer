@@ -23,6 +23,7 @@ import {
 } from "@/lib/soul-check-highlights";
 import {
   appendParagraphInEditor,
+  loadDocumentWithoutHistory,
   replaceTextInEditor,
 } from "@/lib/editor-transactions";
 
@@ -31,10 +32,12 @@ export interface TipTapEditorHandle {
   insertAtCursor: (text: string) => void;
   replaceTargetText: (searchText: string, replacement: string) => boolean;
   appendParagraph: (prose: string) => boolean;
+  loadDocument: (html: string) => boolean;
 }
 
 interface TipTapEditorProps {
   content: string;
+  documentKey?: string | null;
   onUpdate: (html: string) => void;
   soulCheckInsights?: SoulCheckInsight[];
   activeInsightIndex?: number | null;
@@ -74,6 +77,7 @@ function MenuButton({
 
 export function TipTapEditor({
   content,
+  documentKey = null,
   onUpdate,
   soulCheckInsights = [],
   activeInsightIndex = null,
@@ -85,6 +89,8 @@ export function TipTapEditor({
 }: TipTapEditorProps) {
     const highlightHandlerRef = useRef(onHighlightInsight);
     const lastSelectionInsightRef = useRef<number | null>(null);
+    const loadedDocumentKeyRef = useRef<string | null>(null);
+    const appliedInsightsRef = useRef("");
 
     useEffect(() => {
       highlightHandlerRef.current = onHighlightInsight;
@@ -138,6 +144,8 @@ export function TipTapEditor({
           replaceTextInEditor(editor, searchText, replacement),
         appendParagraph: (prose: string) =>
           appendParagraphInEditor(editor, prose),
+        loadDocument: (html: string) =>
+          loadDocumentWithoutHistory(editor, html),
       });
       return () => onEditorReady(null);
     }, [editor, onEditorReady]);
@@ -162,13 +170,23 @@ export function TipTapEditor({
 
     useEffect(() => {
       if (!editor || editor.isDestroyed) return;
-      const normalized = normalizeDraftContent(content);
-      if (normalized !== editor.getHTML()) {
-        editor.commands.setContent(normalized, { emitUpdate: false });
-      }
-    }, [content, editor]);
 
-    const appliedInsightsRef = useRef("");
+      const normalized = normalizeDraftContent(content);
+      const keyChanged =
+        documentKey != null && loadedDocumentKeyRef.current !== documentKey;
+
+      if (keyChanged) {
+        loadDocumentWithoutHistory(editor, normalized);
+        loadedDocumentKeyRef.current = documentKey;
+        lastSelectionInsightRef.current = null;
+        clearSoulCheckHighlights(editor);
+        return;
+      }
+
+      if (normalized !== editor.getHTML()) {
+        loadDocumentWithoutHistory(editor, normalized);
+      }
+    }, [content, documentKey, editor]);
 
     useEffect(() => {
       if (!editor || editor.isDestroyed) return;

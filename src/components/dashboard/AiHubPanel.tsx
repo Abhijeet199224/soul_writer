@@ -220,7 +220,7 @@ function SoulCheckInsightCard({
               htmlFor={`custom-tone-${index}`}
               className="text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-500"
             >
-              ✨ Custom Tone Shift…
+              ✨ Adjust this text to any custom tone…
             </label>
             <input
               id={`custom-tone-${index}`}
@@ -228,7 +228,7 @@ function SoulCheckInsightCard({
               value={customPrompt}
               onChange={(event) => setCustomPrompt(event.target.value)}
               disabled={customLoading}
-              placeholder='e.g. "Make it sound highly cynical" or "Write it in the style of Kafka"'
+              placeholder='e.g. "Make it sound highly cynical" or "Write it in the style of Ernest Hemingway"'
               title="Describe any tone or style — press Enter to rewrite this sentence on the canvas"
               className="mt-1.5 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-amber-400 disabled:opacity-60"
             />

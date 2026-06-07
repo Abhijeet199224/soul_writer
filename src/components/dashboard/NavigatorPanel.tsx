@@ -21,13 +21,13 @@ export function NavigatorPanel() {
     chapters,
     activeChapterId,
     switchChapter,
+    selectPlotBeat,
     characters,
     handleCharacterSaved,
     setCharacters,
     settingNotes,
     setSettingNotes,
     updateChapterMeta,
-    setBeat,
     navigatorCollapsed,
     setNavigatorCollapsed,
   } = useStoryEngine();
@@ -113,35 +113,63 @@ export function NavigatorPanel() {
             {chapters.map((chapter) => {
               const isActive = chapter.id === activeChapterId;
               return (
-                <button
+                <div
                   key={chapter.id}
-                  type="button"
-                  onClick={() => switchChapter(chapter.id)}
-                  className={`w-full rounded-xl border p-3 text-left transition ${
+                  className={`w-full rounded-xl border p-3 transition ${
                     isActive
                       ? "border-amber-400 bg-amber-50/70 ring-1 ring-amber-300/60"
-                      : "border-stone-200 bg-stone-50 hover:border-amber-200"
+                      : "border-stone-200 bg-stone-50"
                   }`}
                 >
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                    {chapter.act}
-                  </span>
-                  <p className="mt-1 font-serif text-sm font-medium text-stone-900">
-                    {chapter.title}
-                  </p>
-                  {chapter.plot_objectives && (
-                    <p className="mt-1 line-clamp-2 text-xs text-stone-500">
-                      {chapter.plot_objectives}
+                  <button
+                    type="button"
+                    onClick={() => switchChapter(chapter.id)}
+                    title={`Open ${chapter.act} workspace — loads manuscript without affecting undo history`}
+                    className="w-full text-left"
+                  >
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                      {chapter.act}
+                    </span>
+                    <p className="mt-1 font-serif text-sm font-medium text-stone-900">
+                      {chapter.title}
                     </p>
-                  )}
+                    {chapter.plot_objectives && (
+                      <p className="mt-1 line-clamp-2 text-xs text-stone-500">
+                        {chapter.plot_objectives}
+                      </p>
+                    )}
+                  </button>
+
                   {chapter.plot_beats.length > 0 && (
-                    <ul className="mt-2 space-y-0.5 text-[10px] text-stone-500">
-                      {chapter.plot_beats.map((beat) => (
-                        <li key={beat.id}>• {beat.title}</li>
-                      ))}
+                    <ul className="mt-3 space-y-1 border-t border-stone-200/80 pt-2">
+                      <li className="text-[10px] font-semibold uppercase tracking-wide text-stone-400">
+                        Plot trajectory beats
+                      </li>
+                      {chapter.plot_beats.map((plotBeat) => {
+                        const beatActive =
+                          isActive && chapter.scene_beat === plotBeat.title;
+                        return (
+                          <li key={plotBeat.id}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                selectPlotBeat(chapter.id, plotBeat.title)
+                              }
+                              title={`Focus this scene beat in the canvas header and AI context — ${plotBeat.title}`}
+                              className={`w-full rounded-lg px-2 py-1.5 text-left text-[11px] transition ${
+                                beatActive
+                                  ? "bg-amber-100 font-medium text-amber-900"
+                                  : "text-stone-600 hover:bg-stone-100 hover:text-stone-900"
+                              }`}
+                            >
+                              • {plotBeat.title}
+                            </button>
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
-                </button>
+                </div>
               );
             })}
 
@@ -161,16 +189,6 @@ export function NavigatorPanel() {
                   rows={3}
                   className="mt-1 w-full resize-none rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-amber-400"
                 />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const chapter = chapters.find((c) => c.id === activeChapterId);
-                    if (chapter?.scene_beat) setBeat(chapter.scene_beat);
-                  }}
-                  className="mt-2 text-xs text-amber-800 hover:underline"
-                >
-                  Sync scene beat to canvas
-                </button>
               </div>
             )}
           </div>

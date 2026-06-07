@@ -50,12 +50,22 @@ export interface InsightRewriteState {
   label: string;
 }
 
+export interface WorkspaceSessionContext {
+  chapterId: string;
+  act: string;
+  chapterTitle: string;
+  plotObjectives: string;
+  sceneBeat: string;
+  activePlotBeatTitle: string | null;
+}
+
 interface StoryEngineContextValue {
   story: Story;
   characters: Character[];
   chapters: StoryChapter[];
   activeChapter: StoryChapter | null;
   activeChapterId: string | null;
+  sessionContext: WorkspaceSessionContext | null;
   settingNotes: string;
   sliderValue: number;
   draft: string;
@@ -80,7 +90,8 @@ interface StoryEngineContextValue {
   setNavigatorCollapsed: (v: boolean | ((p: boolean) => boolean)) => void;
   setAiHubCollapsed: (v: boolean | ((p: boolean) => boolean)) => void;
   setAiTab: (tab: "soul-check" | "ghostwrite") => void;
-  switchChapter: (chapterId: string) => void;
+  switchChapter: (chapterId: string, plotBeatTitle?: string) => void;
+  selectPlotBeat: (chapterId: string, plotBeatTitle: string) => void;
   updateDraft: (html: string) => void;
   setBeat: (beat: string) => void;
   setSliderValue: (value: number) => void;
@@ -180,8 +191,24 @@ export function StoryEngineProvider({
     [chapters, activeChapterId],
   );
 
+  const [activePlotBeatTitle, setActivePlotBeatTitle] = useState<string | null>(
+    null,
+  );
+
   const draft = activeChapter?.draft_content ?? "";
   const beat = activeChapter?.scene_beat ?? "";
+
+  const sessionContext = useMemo<WorkspaceSessionContext | null>(() => {
+    if (!activeChapter) return null;
+    return {
+      chapterId: activeChapter.id,
+      act: activeChapter.act,
+      chapterTitle: activeChapter.title,
+      plotObjectives: activeChapter.plot_objectives,
+      sceneBeat: beat,
+      activePlotBeatTitle,
+    };
+  }, [activeChapter, beat, activePlotBeatTitle]);
 
   const storyBible = useStoryBibleIndex(
     characters,
@@ -265,13 +292,36 @@ export function StoryEngineProvider({
   );
 
   const switchChapter = useCallback(
-    (chapterId: string) => {
-      if (chapterId === activeChapterId) return;
-      setActiveChapterId(chapterId);
-      setActiveInsightIndex(null);
-      clearRewriteStates();
+    (chapterId: string, plotBeatTitle?: string) => {
+      const chapter = chapters.find((c) => c.id === chapterId);
+      if (!chapter) return;
+
+      const isSameChapter = chapterId === activeChapterId;
+      if (isSameChapter && !plotBeatTitle) return;
+
+      if (!isSameChapter) {
+        setActiveChapterId(chapterId);
+        setActiveInsightIndex(null);
+        clearRewriteStates();
+        setSoulCheckResult(null);
+        setGhostwriteResult(null);
+      }
+
+      const nextBeat = plotBeatTitle ?? chapter.scene_beat ?? "";
+      if (nextBeat !== chapter.scene_beat) {
+        updateChapterInState(chapterId, { scene_beat: nextBeat });
+      }
+
+      setActivePlotBeatTitle(plotBeatTitle ?? null);
     },
-    [activeChapterId, clearRewriteStates],
+    [chapters, activeChapterId, clearRewriteStates, updateChapterInState],
+  );
+
+  const selectPlotBeat = useCallback(
+    (chapterId: string, plotBeatTitle: string) => {
+      switchChapter(chapterId, plotBeatTitle);
+    },
+    [switchChapter],
   );
 
   const updateDraft = useCallback(
@@ -337,6 +387,7 @@ export function StoryEngineProvider({
       renamePrompt.newName,
     );
     updateChapterInState(activeChapter.id, { draft_content: updated });
+    editorHandleRef.current?.loadDocument(updated);
     setRenamePrompt(null);
   }, [renamePrompt, activeChapter, updateChapterInState]);
 
@@ -416,14 +467,42 @@ export function StoryEngineProvider({
       setAiError(null);
 
       try {
-        const characterContext = linkedNames.join(", ");
+        const relevantCharacters = characters.filter((character) =>
+          linkedNames.includes(character.name),
+        );
+        const codexContext = [
+          sessionContext
+            ? `Act: ${sessionContext.act}\nChapter: ${sessionContext.chapterTitle}\nPlot objectives: ${sessionContext.plotObjectives || "None"}\nScene beat: ${sessionContext.sceneBeat || "None"}`
+            : "",
+          settingNotes.trim()
+            ? `Setting & lore:\n${settingNotes.trim()}`
+            : "",
+          relevantCharacters.length
+            ? `Characters:\n${relevantCharacters
+                .map(
+                  (c) =>
+                    `${c.name} (${c.role}) — flaw: ${c.core_flaw ?? "n/a"}; motivation: ${c.primary_motivation ?? "n/a"}`,
+                )
+                .join("\n")}`
+            : linkedNames.length
+              ? `Characters in draft: ${linkedNames.join(", ")}`
+              : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+
         const response = await fetch("/api/custom-rewrite", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             targetText,
             customPrompt: trimmedPrompt,
-            characterContext,
+            characterContext: codexContext,
+            sceneBeat: beat,
+            plotObjectives: activeChapter?.plot_objectives ?? "",
+            chapterAct: activeChapter?.act ?? "",
+            chapterTitle: activeChapter?.title ?? "",
+            settingNotes,
           }),
         });
         const data = await response.json();
@@ -447,7 +526,7 @@ export function StoryEngineProvider({
         setCustomRewriteLoading(null);
       }
     },
-    [linkedNames, applyPresetRewrite],
+    [linkedNames, applyPresetRewrite, characters, sessionContext, settingNotes, beat, activeChapter],
   );
 
   const onHighlightInsight = useCallback((index: number) => {
@@ -592,6 +671,7 @@ export function StoryEngineProvider({
     chapters,
     activeChapter,
     activeChapterId,
+    sessionContext,
     settingNotes,
     sliderValue,
     draft,
@@ -617,6 +697,7 @@ export function StoryEngineProvider({
     setAiHubCollapsed,
     setAiTab,
     switchChapter,
+    selectPlotBeat,
     updateDraft,
     setBeat,
     setSliderValue,
