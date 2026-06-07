@@ -112,7 +112,7 @@ export function replaceTextInEditor(
     .run();
 }
 
-/** Replace every whole-word match in one undoable transaction. */
+/** Replace every whole-word match in one undoable transaction via insertContentAt semantics. */
 export function replaceAllWordsInEditor(
   editor: Editor,
   searchWord: string,
@@ -130,7 +130,8 @@ export function replaceAllWordsInEditor(
     .command(({ tr, dispatch }) => {
       const sorted = [...ranges].sort((a, b) => b.from - a.from);
       for (const { from, to } of sorted) {
-        tr.insertText(trimmed, from, to);
+        const slice = editor.schema.text(trimmed);
+        tr.replaceWith(from, to, slice);
       }
       if (dispatch) dispatch(tr);
       return true;

@@ -12,7 +12,7 @@ import {
 interface CharacterFormProps {
   storyId: string;
   character?: Character;
-  onSaved: (character: Character) => void;
+  onSaved: (character: Character, previousName?: string) => void;
   onCancel?: () => void;
 }
 
@@ -85,7 +85,7 @@ export function CharacterForm({
       return;
     }
 
-    onSaved(data as Character);
+    onSaved(data as Character, character?.name);
     if (!character) {
       setForm(emptyForm);
     }

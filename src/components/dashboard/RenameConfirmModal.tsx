@@ -4,7 +4,8 @@ interface RenameConfirmModalProps {
   oldName: string;
   newName: string;
   mentionCount: number;
-  onConfirm: () => void;
+  loading?: boolean;
+  onConfirm: () => void | Promise<void>;
   onDismiss: () => void;
 }
 
@@ -12,6 +13,7 @@ export function RenameConfirmModal({
   oldName,
   newName,
   mentionCount,
+  loading = false,
   onConfirm,
   onDismiss,
 }: RenameConfirmModalProps) {
@@ -19,7 +21,7 @@ export function RenameConfirmModal({
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/45 p-4 backdrop-blur-[2px]"
       role="presentation"
-      onClick={onDismiss}
+      onClick={loading ? undefined : onDismiss}
     >
       <div
         role="dialog"
@@ -35,28 +37,31 @@ export function RenameConfirmModal({
           id="rename-modal-title"
           className="mt-2 font-serif text-xl text-stone-900"
         >
-          Update character name in this chapter?
+          Update character name across your manuscript?
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-stone-600">
           Change all {mentionCount} mention{mentionCount === 1 ? "" : "s"} of{" "}
           <strong className="text-stone-900">{oldName}</strong> to{" "}
-          <strong className="text-amber-900">{newName}</strong> in the active
-          manuscript? This swap uses TipTap transactions — Ctrl+Z can revert it.
+          <strong className="text-amber-900">{newName}</strong> in every Act and
+          chapter? Background storage updates immediately, and the open canvas
+          uses TipTap transactions — Ctrl+Z can revert the active chapter.
         </p>
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button
             type="button"
             onClick={onDismiss}
-            className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+            disabled={loading}
+            className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Keep Original
           </button>
           <button
             type="button"
-            onClick={onConfirm}
-            className="rounded-xl bg-amber-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-800"
+            onClick={() => void onConfirm()}
+            disabled={loading}
+            className="rounded-xl bg-amber-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Update All
+            {loading ? "Syncing manuscript…" : "Update All Chapters"}
           </button>
         </div>
       </div>
